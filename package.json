@@ -9,6 +9,7 @@
     "test": "pnpm -r test && pnpm test:legacy",
     "test:legacy": "node --test legacy/clean-start.test.mjs",
     "build:vercel": "node scripts/build-vercel.mjs",
+    "vercel-build": "pnpm build:vercel",
     "deploy:vercel": "node scripts/deploy.mjs"
   },
   "devDependencies": {
