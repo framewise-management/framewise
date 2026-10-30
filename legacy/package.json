@@ -1,0 +1,8 @@
+{
+  "name": "wedding-clap-empty",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test clean-start.test.mjs"
+  }
+}

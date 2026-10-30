@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  // client tests run in Node, so they are type-checked here, with Node's types
+  "include": ["src", "../client/src/**/*.test.ts"]
+}

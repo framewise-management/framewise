@@ -1,0 +1,2 @@
+export {defaultProductionStages as stages} from './production.js?v=booking-15';
+export const demo=()=>({"version":1,"nextClient":1,"clients":[],"events":[],"enquiries":[],"team":[],"payments":[],"projects":[],"tasks":[],"expenses":[],"documents":[],"assignments":[],"settings":{"company":"Wedding Clap","currency":"INR"},"packages":[],"invoices":[],"deletedClients":[],"paymentAudit":[],"nextInvoice":1,"packageMigration":true});

@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.base.json",
+  // Node types are for the *.test.ts files only; shared code itself must not use node:* or process
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

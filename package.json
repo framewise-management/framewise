@@ -1,0 +1,17 @@
+{
+  "name": "framewise",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test && pnpm test:legacy",
+    "test:legacy": "node --test legacy/clean-start.test.mjs",
+    "build:vercel": "node scripts/build-vercel.mjs",
+    "deploy:vercel": "node scripts/deploy.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

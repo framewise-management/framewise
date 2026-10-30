@@ -1,0 +1,22 @@
+{
+  "name": "@framewise/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/main.ts",
+    "start": "node --env-file-if-exists=.env src/main.ts",
+    "typecheck": "tsc -p .",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@framewise/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.118.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.2"
+  }
+}

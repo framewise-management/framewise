@@ -1,0 +1,16 @@
+{
+  "name": "@framewise/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.2"
+  }
+}
