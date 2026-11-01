@@ -134,6 +134,13 @@ export class EventService {
       newProjects.push(project)
       changes.push({ op: 'insert', table: 'projects', row: { ...project } })
     }
+    const bookedProject = projects.find(p => p.event_id === id && p.stage_names[0] === 'Upcoming')
+    if (next.status === 'Shoot Completed' && bookedProject && !bookedProject.completed_stages.includes('Shoot Completed')) {
+      const completed = [...new Set([...bookedProject.completed_stages, 'Upcoming', 'Shoot Completed'])]
+      const set = { stage: Math.max(1, bookedProject.stage), completed_stages: completed }
+      changes.push({ op: 'update', table: 'projects', match: { id: bookedProject.id }, set })
+      newProjects[newProjects.findIndex(p => p.id === bookedProject.id)] = { ...bookedProject, ...set }
+    }
     changes.push(...ClientCompletion.changes(client, events.map(e => e.id === id ? next : e), newProjects))
     if (!changes.length) return event as unknown as Row
     await this.#db.apply(changes)

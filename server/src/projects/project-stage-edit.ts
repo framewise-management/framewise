@@ -11,7 +11,7 @@ export class ProjectStageEdit {
     const v: Row = { ...patch }
     if ('stage' in v && !('completed_stages' in v) && !('stage_names' in v)) {
       const index = v.stage as number
-      v.completed_stages = index === list.length - 1 ? [...list] : list.slice(0, Math.max(1, index))
+      v.completed_stages = index === list.length - 1 ? [...list] : list.slice(0, Math.max(list[0] === 'Upcoming' ? 0 : 1, index))
     }
     if ('completed_stages' in v) {
       const done = v.completed_stages
@@ -19,9 +19,9 @@ export class ProjectStageEdit {
     }
     if ('stage_names' in v) {
       const next = v.stage_names
-      if (!Array.isArray(next) || next[0] !== 'Shoot Completed' || next.at(-1) !== 'Completed' || next.length < 2 || next.length > 50
+      if (!Array.isArray(next) || !ProductionStages.validStart(next) || next.at(-1) !== 'Completed' || next.length < 2 || next.length > 50
           || next.some(s => typeof s !== 'string' || !s.trim()) || new Set(next).size !== next.length)
-        throw new HttpError(400, 'Use unique stages between Shoot Completed and Completed')
+        throw new HttpError(400, list[0] === 'Upcoming' ? 'Use unique stages from Upcoming / Shoot Completed to Completed' : 'Use unique stages between Shoot Completed and Completed')
       const current = list[row.stage]
       if (!next.includes(current)) throw new HttpError(400, 'Keep the current stage: ' + current)
       const done = ProductionStages.completed({ stage: row.stage, stageNames: row.stage_names, completedStages: row.completed_stages })

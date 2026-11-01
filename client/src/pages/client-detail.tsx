@@ -15,9 +15,10 @@ import { Empty, Icon, Tag } from '../ui/icon.tsx'
 import { BookedEvents } from './booked-events.tsx'
 import { EventCard } from './event-card.tsx'
 import { ClientTeam } from './client-team.tsx'
+import { ClientQuotes } from '../quotes/client-quotes.tsx'
 import { InvoicePrinter, type IssuedDocument } from '../invoices/invoice-printer.ts'
 
-const TABS = ['Overview', 'Events', 'Payments', 'Team', 'Delivery', 'Project', 'Notes'] as const
+const TABS = ['Overview', 'Events', 'Quotes', 'Payments', 'Team', 'Delivery', 'Project', 'Notes'] as const
 
 export function ClientDetail({ id }: { id: string }) {
   const studio = useStudio()
@@ -48,6 +49,7 @@ export function ClientDetail({ id }: { id: string }) {
       <div className="profile-tab-body">
         {tab === 'Overview' && <Overview client={c} />}
         {tab === 'Events' && <Events client={c} />}
+        {tab === 'Quotes' && <ClientQuotes clientId={c.id} />}
         {tab === 'Payments' && <Payments client={c} />}
         {tab === 'Team' && <ClientTeam clientId={c.id} />}
         {tab === 'Notes' && <Notes client={c} />}

@@ -15,6 +15,7 @@ import { TeamService } from '../team/team-service.ts'
 import { TermsService } from '../terms/terms-service.ts'
 import { PaymentSettings } from '../settings/payment-settings.ts'
 import { StudioProfile } from '../studios/studio-profile.ts'
+import { QuoteService } from '../quotes/quote-service.ts'
 import { Body } from './body.ts'
 import { HttpError } from './http-error.ts'
 import { InvoiceService } from '../invoices/invoice-service.ts'
@@ -28,6 +29,7 @@ export interface ApiServerDeps {
 
 export interface StudioServices {
   clients: ClientService
+  quotes: QuoteService
   events: EventService
   enquiries: EnquiryService
   packages: PackageService
@@ -50,6 +52,21 @@ export class ApiServer {
     app.use(express.json({ limit: '1mb' }))
     app.get('/health', (_req, res) => { res.json({ ok: true }) })
 
+    const publicQuote = express.Router()
+    publicQuote.use((_req, res, next) => {
+      res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' })
+      next()
+    })
+    publicQuote.get('/:studio/:token', async (req, res) => {
+      if (!/^[a-f0-9-]{36}$/i.test(req.params.studio)) throw new HttpError(404, 'Quote not found')
+      res.json(await servicesFor(req.params.studio).quotes.view(req.params.token))
+    })
+    publicQuote.post('/:studio/:token/accept', async (req, res) => {
+      if (!/^[a-f0-9-]{36}$/i.test(req.params.studio)) throw new HttpError(404, 'Quote not found')
+      res.json(await servicesFor(req.params.studio).quotes.accept(req.params.token, req.body?.code, req.body?.consent))
+    })
+    app.use('/api/public/quotes', publicQuote)
+
     const api = express.Router()
     api.use(requireStudio(auth, servicesFor))
 
@@ -62,6 +79,9 @@ export class ApiServer {
     api.post('/terms', async (req, res) => { res.status(201).json(await services(res).terms.create(Body.pick(req.body, ['title', 'body']))) })
     api.patch('/terms/:id', async (req, res) => { res.json(await services(res).terms.update(req.params.id, Body.pick(req.body, ['title', 'body', 'active']))) })
     api.delete('/terms/:id', async (req, res) => { await services(res).terms.remove(req.params.id); res.status(204).end() })
+
+    api.get('/clients/:id/quotes', async (req, res) => { res.json(await services(res).quotes.list(req.params.id)) })
+    api.post('/clients/:id/quotes', async (req, res) => { res.status(201).json(await services(res).quotes.create(req.params.id)) })
 
     api.get('/clients', async (_req, res) => { res.json(await services(res).clients.list()) })
     api.get('/clients/deleted', async (_req, res) => { res.json(await services(res).clients.deleted()) })

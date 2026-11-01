@@ -1,0 +1,16 @@
+.public-quote { max-width: 780px; margin: 0 auto; padding: 40px 24px 64px; overflow-wrap: anywhere; }
+.public-quote header { margin-bottom: 36px; }
+.public-quote section { margin: 32px 0; }
+.public-quote h1 { margin: 8px 0 16px; }
+.public-quote h2 { margin-bottom: 16px; }
+.public-quote p { line-height: 1.6; }
+.quote-row { padding: 16px 0; border-bottom: 1px solid var(--line, #d8d8d8); }
+.quote-row h3 { margin: 0; }
+.quote-terms { white-space: pre-wrap; }
+.quote-total { padding: 24px 0; font-size: 1.2rem; }
+.quote-consent { display: flex; align-items: flex-start; gap: 12px; margin: 20px 0; }
+.quote-consent input { width: 20px; height: 20px; flex: 0 0 20px; margin-top: 2px; }
+.quote-accept .field { max-width: 240px; }
+.quote-share-link { width: 100%; min-width: 0; }
+@media (max-width: 600px) { .public-quote { padding: 24px 16px 40px; } .public-quote .line-items { flex-wrap: wrap; gap: 8px; } }
+@media print { .quote-accept, .quote-print { display: none; } .public-quote { max-width: none; padding: 0; } .quote-row { break-inside: avoid; } }

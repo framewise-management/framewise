@@ -6,6 +6,7 @@ import { Session } from './api/session.ts'
 import { StudioProvider } from './data/studio-context.tsx'
 import { LoginPage } from './pages/login-page.tsx'
 import { Shell } from './pages/shell.tsx'
+import { QuotePage } from './quotes/quote-page.tsx'
 import './style.css'
 import './workspace.css'
 
@@ -19,6 +20,18 @@ const api = new ApiClient(session)
 createRoot(document.getElementById('root')!).render(<StrictMode><App />{import.meta.env.DEV && <Agentation />}</StrictMode>)
 
 function App() {
+  const [hash, setHash] = useState(location.hash)
+  useEffect(() => {
+    const change = () => setHash(location.hash)
+    window.addEventListener('hashchange', change)
+    return () => window.removeEventListener('hashchange', change)
+  }, [])
+  const quote = hash.match(/^#\/quote\/([a-f0-9-]{36})\/([a-f0-9]{64})$/i)
+  if (quote) return <QuotePage key={hash} studioId={quote[1]} token={quote[2]} />
+  return <Workspace />
+}
+
+function Workspace() {
   const [email, setEmail] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     const check = () => { session.email().then(setEmail) }

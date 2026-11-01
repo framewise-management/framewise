@@ -16,6 +16,7 @@ import { TeamService } from './team/team-service.ts'
 import { TermsService } from './terms/terms-service.ts'
 import { PaymentSettings } from './settings/payment-settings.ts'
 import { StudioProfile } from './studios/studio-profile.ts'
+import { QuoteService } from './quotes/quote-service.ts'
 
 // wiring shared by local start-up (main.ts), the Vercel function (vercel.ts) and the create-studio script
 export class Studio {
@@ -41,6 +42,7 @@ export class Studio {
     const packages = new PackageService(db)
     return {
       clients: new ClientService(db, events, packages),
+      quotes: new QuoteService(db),
       events,
       enquiries: new EnquiryService(db),
       packages,
