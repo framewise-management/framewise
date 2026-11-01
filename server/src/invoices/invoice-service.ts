@@ -25,7 +25,7 @@ export class InvoiceService {
     if (!payment) throw new HttpError(404, 'Payment not found')
     const [client] = await this.#db.select<ClientRow>('clients', { id: payment.client_id })
     if (!client || client.deleted_at) throw new HttpError(404, 'Client not found')
-    const [settings] = await this.#db.select<Row>('settings')
+    const [settings] = await this.#db.select<Row>('studios')
     const [event] = payment.event_id ? await this.#db.select<EventRow>('events', { id: payment.event_id }) : []
     const [pkg] = payment.package_id ? await this.#db.select<PackageRow>('packages', { id: payment.package_id }) : []
     const [events, packages, payments] = await Promise.all([

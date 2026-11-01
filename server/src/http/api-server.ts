@@ -1,5 +1,5 @@
 import type { Server } from 'node:http'
-import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express'
+import express, { type ErrorRequestHandler, type Express, type RequestHandler, type Response } from 'express'
 import { PricingError } from '@framewise/shared/pricing-error.ts'
 import { ClientService, type PackagePlan } from '../clients/client-service.ts'
 import { DatabaseError } from '../db/database-error.ts'
@@ -21,6 +21,11 @@ import type { TokenVerifier } from './supabase-token-verifier.ts'
 
 export interface ApiServerDeps {
   auth: TokenVerifier
+  // the services of one studio, built per request for the signed-in user's studio
+  servicesFor(studioId: string): StudioServices
+}
+
+export interface StudioServices {
   clients: ClientService
   events: EventService
   enquiries: EnquiryService
@@ -38,88 +43,88 @@ export interface ApiServerDeps {
 export class ApiServer {
   readonly #app: Express
 
-  constructor({ auth, clients, events, enquiries, packages, payments, team, expenses, projects, tasks, terms, paymentSettings, invoices }: ApiServerDeps) {
+  constructor({ auth, servicesFor }: ApiServerDeps) {
     const app = express()
     app.use(express.json({ limit: '1mb' }))
     app.get('/health', (_req, res) => { res.json({ ok: true }) })
 
     const api = express.Router()
-    api.use(requireUser(auth))
+    api.use(requireStudio(auth, servicesFor))
 
-    api.get('/payment-settings', async (_req, res) => { res.json(await paymentSettings.get()) })
-    api.put('/payment-settings', async (req, res) => { res.json(await paymentSettings.update(Body.pick(req.body, ['payment_conditions', 'payment_modes', 'upi_id', 'bank_details', 'gst_number', 'payment_notes', 'invoice_prefix', 'invoice_padding']))) })
+    api.get('/payment-settings', async (_req, res) => { res.json(await services(res).paymentSettings.get()) })
+    api.put('/payment-settings', async (req, res) => { res.json(await services(res).paymentSettings.update(Body.pick(req.body, ['payment_conditions', 'payment_modes', 'upi_id', 'bank_details', 'gst_number', 'payment_notes', 'invoice_prefix', 'invoice_padding']))) })
 
-    api.get('/terms', async (_req, res) => { res.json(await terms.list()) })
-    api.post('/terms', async (req, res) => { res.status(201).json(await terms.create(Body.pick(req.body, ['title', 'body']))) })
-    api.patch('/terms/:id', async (req, res) => { res.json(await terms.update(req.params.id, Body.pick(req.body, ['title', 'body', 'active']))) })
-    api.delete('/terms/:id', async (req, res) => { await terms.remove(req.params.id); res.status(204).end() })
+    api.get('/terms', async (_req, res) => { res.json(await services(res).terms.list()) })
+    api.post('/terms', async (req, res) => { res.status(201).json(await services(res).terms.create(Body.pick(req.body, ['title', 'body']))) })
+    api.patch('/terms/:id', async (req, res) => { res.json(await services(res).terms.update(req.params.id, Body.pick(req.body, ['title', 'body', 'active']))) })
+    api.delete('/terms/:id', async (req, res) => { await services(res).terms.remove(req.params.id); res.status(204).end() })
 
-    api.get('/clients', async (_req, res) => { res.json(await clients.list()) })
-    api.get('/clients/deleted', async (_req, res) => { res.json(await clients.deleted()) })
-    api.put('/clients/order', async (req, res) => { await clients.reorder(Body.list(req.body?.ids, 'ids')); res.status(204).end() })
+    api.get('/clients', async (_req, res) => { res.json(await services(res).clients.list()) })
+    api.get('/clients/deleted', async (_req, res) => { res.json(await services(res).clients.deleted()) })
+    api.put('/clients/order', async (req, res) => { await services(res).clients.reorder(Body.list(req.body?.ids, 'ids')); res.status(204).end() })
     api.post('/clients', async (req, res) => {
       const { client, days, packages: plans } = req.body ?? {}
       const row = Body.pick(client, ClientService.editable)
       const list = Body.list<DayInput>(days, 'days')
-      res.status(201).json(plans === undefined ? await clients.create(row, list) : await clients.createPackaged(row, list, Body.list<PackagePlan>(plans, 'packages')))
+      res.status(201).json(plans === undefined ? await services(res).clients.create(row, list) : await services(res).clients.createPackaged(row, list, Body.list<PackagePlan>(plans, 'packages')))
     })
-    api.patch('/clients/:id', async (req, res) => { res.json(await clients.update(req.params.id, Body.pick(req.body, ClientService.editable))) })
-    api.delete('/clients/:id', async (req, res) => { await clients.remove(req.params.id); res.status(204).end() })
-    api.post('/clients/:id/restore', async (req, res) => { await clients.restore(req.params.id); res.status(204).end() })
-    api.post('/clients/:id/events', async (req, res) => { res.status(201).json(await events.addDays(req.params.id, Body.list<DayInput>(req.body?.days, 'days'))) })
+    api.patch('/clients/:id', async (req, res) => { res.json(await services(res).clients.update(req.params.id, Body.pick(req.body, ClientService.editable))) })
+    api.delete('/clients/:id', async (req, res) => { await services(res).clients.remove(req.params.id); res.status(204).end() })
+    api.post('/clients/:id/restore', async (req, res) => { await services(res).clients.restore(req.params.id); res.status(204).end() })
+    api.post('/clients/:id/events', async (req, res) => { res.status(201).json(await services(res).events.addDays(req.params.id, Body.list<DayInput>(req.body?.days, 'days'))) })
 
-    api.get('/events', async (_req, res) => { res.json(await events.list()) })
-    api.patch('/events/:id', async (req, res) => { res.json(await events.update(req.params.id, Body.pick(req.body, EventService.editable))) })
-    api.patch('/events/:id/team/:memberId', async (req, res) => { await events.setTeamRole(req.params.id, req.params.memberId, req.body?.role); res.status(204).end() })
-    api.delete('/events/:id', async (req, res) => { await events.remove(req.params.id); res.status(204).end() })
+    api.get('/events', async (_req, res) => { res.json(await services(res).events.list()) })
+    api.patch('/events/:id', async (req, res) => { res.json(await services(res).events.update(req.params.id, Body.pick(req.body, EventService.editable))) })
+    api.patch('/events/:id/team/:memberId', async (req, res) => { await services(res).events.setTeamRole(req.params.id, req.params.memberId, req.body?.role); res.status(204).end() })
+    api.delete('/events/:id', async (req, res) => { await services(res).events.remove(req.params.id); res.status(204).end() })
 
-    api.get('/enquiries', async (_req, res) => { res.json(await enquiries.list()) })
-    api.post('/enquiries', async (req, res) => { res.status(201).json(await enquiries.create(Body.pick(req.body, EnquiryService.editable))) })
-    api.patch('/enquiries/:id', async (req, res) => { res.json(await enquiries.update(req.params.id, Body.pick(req.body, EnquiryService.editable))) })
-    api.delete('/enquiries/:id', async (req, res) => { await enquiries.remove(req.params.id); res.status(204).end() })
-    api.post('/enquiries/:id/convert', async (req, res) => { res.json(await enquiries.convert(req.params.id)) })
+    api.get('/enquiries', async (_req, res) => { res.json(await services(res).enquiries.list()) })
+    api.post('/enquiries', async (req, res) => { res.status(201).json(await services(res).enquiries.create(Body.pick(req.body, EnquiryService.editable))) })
+    api.patch('/enquiries/:id', async (req, res) => { res.json(await services(res).enquiries.update(req.params.id, Body.pick(req.body, EnquiryService.editable))) })
+    api.delete('/enquiries/:id', async (req, res) => { await services(res).enquiries.remove(req.params.id); res.status(204).end() })
+    api.post('/enquiries/:id/convert', async (req, res) => { res.json(await services(res).enquiries.convert(req.params.id)) })
 
-    api.get('/packages', async (_req, res) => { res.json(await packages.list()) })
-    api.post('/clients/:id/packages', async (req, res) => { res.status(201).json(await packages.create(req.params.id, Body.pick(req.body, PackageService.editable) as PackageInput)) })
-    api.patch('/packages/:id', async (req, res) => { res.json(await packages.update(req.params.id, Body.pick(req.body, PackageService.editable) as PackageInput)) })
-    api.put('/packages/:id/items', async (req, res) => { res.json(await packages.saveItems(req.params.id, Body.list<ItemEdit>(req.body?.items, 'items'))) })
+    api.get('/packages', async (_req, res) => { res.json(await services(res).packages.list()) })
+    api.post('/clients/:id/packages', async (req, res) => { res.status(201).json(await services(res).packages.create(req.params.id, Body.pick(req.body, PackageService.editable) as PackageInput)) })
+    api.patch('/packages/:id', async (req, res) => { res.json(await services(res).packages.update(req.params.id, Body.pick(req.body, PackageService.editable) as PackageInput)) })
+    api.put('/packages/:id/items', async (req, res) => { res.json(await services(res).packages.saveItems(req.params.id, Body.list<ItemEdit>(req.body?.items, 'items'))) })
     api.patch('/packages/:id/delivery', async (req, res) => {
       const body = Body.pick(req.body, ['drive_link', 'items'])
-      res.json(await packages.updateDelivery(req.params.id, { ...body, items: body.items === undefined ? undefined : Body.list<StatusEdit>(body.items, 'items') }))
+      res.json(await services(res).packages.updateDelivery(req.params.id, { ...body, items: body.items === undefined ? undefined : Body.list<StatusEdit>(body.items, 'items') }))
     })
 
-    api.get('/clients/:id/invoices', async (req, res) => { res.json(await invoices.clientDocuments(req.params.id)) })
-    api.post('/payments/:id/receipt', async (req, res) => { res.json(await invoices.issueReceipt(req.params.id)) })
-    api.get('/invoices/:id', async (req, res) => { res.json(await invoices.get(req.params.id)) })
+    api.get('/clients/:id/invoices', async (req, res) => { res.json(await services(res).invoices.clientDocuments(req.params.id)) })
+    api.post('/payments/:id/receipt', async (req, res) => { res.json(await services(res).invoices.issueReceipt(req.params.id)) })
+    api.get('/invoices/:id', async (req, res) => { res.json(await services(res).invoices.get(req.params.id)) })
 
-    api.get('/payments', async (_req, res) => { res.json(await payments.list()) })
-    api.post('/payments', async (req, res) => { res.status(201).json(await payments.create(Body.pick(req.body, PaymentService.editable))) })
-    api.patch('/payments/:id', async (req, res) => { res.json(await payments.edit(req.params.id, Body.pick(req.body, PaymentService.editable))) })
-    api.get('/stage-plans', async (_req, res) => { res.json(await payments.stagePlans()) })
-    api.put('/clients/:id/stage-plans', async (req, res) => { res.json(await payments.setStagePlan(req.params.id, Body.pick(req.body?.plan, Object.keys(req.body?.plan ?? {})))) })
+    api.get('/payments', async (_req, res) => { res.json(await services(res).payments.list()) })
+    api.post('/payments', async (req, res) => { res.status(201).json(await services(res).payments.create(Body.pick(req.body, PaymentService.editable))) })
+    api.patch('/payments/:id', async (req, res) => { res.json(await services(res).payments.edit(req.params.id, Body.pick(req.body, PaymentService.editable))) })
+    api.get('/stage-plans', async (_req, res) => { res.json(await services(res).payments.stagePlans()) })
+    api.put('/clients/:id/stage-plans', async (req, res) => { res.json(await services(res).payments.setStagePlan(req.params.id, Body.pick(req.body?.plan, Object.keys(req.body?.plan ?? {})))) })
 
-    api.get('/team', async (_req, res) => { res.json(await team.members()) })
-    api.post('/team', async (req, res) => { res.status(201).json(await team.addMember(Body.pick(req.body, TeamService.memberFields))) })
-    api.patch('/team/:id', async (req, res) => { res.json(await team.updateMember(req.params.id, Body.pick(req.body, TeamService.memberFields))) })
-    api.delete('/team/:id', async (req, res) => { await team.removeMember(req.params.id); res.status(204).end() })
-    api.get('/assignments', async (_req, res) => { res.json(await team.assignments()) })
-    api.post('/assignments', async (req, res) => { res.status(201).json(await team.assign(Body.pick(req.body, TeamService.assignmentFields))) })
-    api.patch('/assignments/:id', async (req, res) => { res.json(await team.updateAssignment(req.params.id, Body.pick(req.body, TeamService.assignmentFields))) })
-    api.delete('/assignments/:id', async (req, res) => { await team.unassign(req.params.id); res.status(204).end() })
+    api.get('/team', async (_req, res) => { res.json(await services(res).team.members()) })
+    api.post('/team', async (req, res) => { res.status(201).json(await services(res).team.addMember(Body.pick(req.body, TeamService.memberFields))) })
+    api.patch('/team/:id', async (req, res) => { res.json(await services(res).team.updateMember(req.params.id, Body.pick(req.body, TeamService.memberFields))) })
+    api.delete('/team/:id', async (req, res) => { await services(res).team.removeMember(req.params.id); res.status(204).end() })
+    api.get('/assignments', async (_req, res) => { res.json(await services(res).team.assignments()) })
+    api.post('/assignments', async (req, res) => { res.status(201).json(await services(res).team.assign(Body.pick(req.body, TeamService.assignmentFields))) })
+    api.patch('/assignments/:id', async (req, res) => { res.json(await services(res).team.updateAssignment(req.params.id, Body.pick(req.body, TeamService.assignmentFields))) })
+    api.delete('/assignments/:id', async (req, res) => { await services(res).team.unassign(req.params.id); res.status(204).end() })
 
-    api.get('/expenses', async (_req, res) => { res.json(await expenses.list()) })
-    api.post('/expenses', async (req, res) => { res.status(201).json(await expenses.create(Body.pick(req.body, ExpenseService.editable))) })
-    api.patch('/expenses/:id', async (req, res) => { res.json(await expenses.update(req.params.id, Body.pick(req.body, ExpenseService.editable))) })
-    api.delete('/expenses/:id', async (req, res) => { await expenses.remove(req.params.id); res.status(204).end() })
+    api.get('/expenses', async (_req, res) => { res.json(await services(res).expenses.list()) })
+    api.post('/expenses', async (req, res) => { res.status(201).json(await services(res).expenses.create(Body.pick(req.body, ExpenseService.editable))) })
+    api.patch('/expenses/:id', async (req, res) => { res.json(await services(res).expenses.update(req.params.id, Body.pick(req.body, ExpenseService.editable))) })
+    api.delete('/expenses/:id', async (req, res) => { await services(res).expenses.remove(req.params.id); res.status(204).end() })
 
-    api.get('/projects', async (_req, res) => { res.json(await projects.list()) })
-    api.patch('/projects/:id', async (req, res) => { res.json(await projects.update(req.params.id, Body.pick(req.body, ProjectService.editable))) })
-    api.delete('/projects/:id', async (req, res) => { await projects.remove(req.params.id); res.status(204).end() })
+    api.get('/projects', async (_req, res) => { res.json(await services(res).projects.list()) })
+    api.patch('/projects/:id', async (req, res) => { res.json(await services(res).projects.update(req.params.id, Body.pick(req.body, ProjectService.editable))) })
+    api.delete('/projects/:id', async (req, res) => { await services(res).projects.remove(req.params.id); res.status(204).end() })
 
-    api.get('/tasks', async (_req, res) => { res.json(await tasks.list()) })
-    api.post('/tasks', async (req, res) => { res.status(201).json(await tasks.create(Body.pick(req.body, TaskService.editable))) })
-    api.patch('/tasks/:id', async (req, res) => { res.json(await tasks.update(req.params.id, Body.pick(req.body, TaskService.editable))) })
-    api.delete('/tasks/:id', async (req, res) => { await tasks.remove(req.params.id); res.status(204).end() })
+    api.get('/tasks', async (_req, res) => { res.json(await services(res).tasks.list()) })
+    api.post('/tasks', async (req, res) => { res.status(201).json(await services(res).tasks.create(Body.pick(req.body, TaskService.editable))) })
+    api.patch('/tasks/:id', async (req, res) => { res.json(await services(res).tasks.update(req.params.id, Body.pick(req.body, TaskService.editable))) })
+    api.delete('/tasks/:id', async (req, res) => { await services(res).tasks.remove(req.params.id); res.status(204).end() })
 
     app.use('/api', api)
     app.use((_req, res) => { res.status(404).json({ error: 'Not found' }) })
@@ -139,12 +144,19 @@ export class ApiServer {
   }
 }
 
-function requireUser(auth: TokenVerifier): RequestHandler {
-  return async (req, _res, next) => {
+function requireStudio(auth: TokenVerifier, servicesFor: ApiServerDeps['servicesFor']): RequestHandler {
+  return async (req, res, next) => {
     const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
-    if (!token || !(await auth.verify(token))) throw new HttpError(401, 'Sign in again')
+    const user = token ? await auth.verify(token) : null
+    if (!user) throw new HttpError(401, 'Sign in again')
+    if (!user.studioId) throw new HttpError(403, 'This login is not linked to a studio')
+    res.locals.services = servicesFor(user.studioId)
     next()
   }
+}
+
+function services(res: Response): StudioServices {
+  return res.locals.services
 }
 
 // Postgres codes whose message is meant for the user: rule triggers, checks, bad values, missing links

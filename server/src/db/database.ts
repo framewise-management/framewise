@@ -7,6 +7,7 @@ export type Change =
 
 // Supabase in production, PGlite in tests. Rows come back as JSON (numeric as number, dates as text) from both.
 // Failures are DatabaseError with the Postgres SQLSTATE; PostgREST's own read errors (PGRST…) can only reach the user as a 500.
+// Each instance works for one studio: every read and write is limited to its rows, and the 'studios' table means its own row.
 export interface Database {
   // equality match only: never pass null, it matches nothing in either implementation
   select<T extends object = Row>(table: string, match?: Row): Promise<T[]>
