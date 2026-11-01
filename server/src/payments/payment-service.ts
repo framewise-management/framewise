@@ -29,6 +29,8 @@ export class PaymentService {
   }
 
   async edit(id: string, patch: Row): Promise<Row> {
+    const [receipt] = await this.#db.select<Row>('invoices', { payment_id: id, document_kind: 'receipt' })
+    if (receipt) throw new HttpError(409, 'This payment has an issued receipt. Issued receipts are immutable; contact support to correct it.')
     const [old] = await this.#db.select<PaymentRow>('payments', { id })
     if (!old) throw new HttpError(404, 'Payment not found')
     const next: Row = { ...old, ...patch }

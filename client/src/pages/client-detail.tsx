@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Booking } from '@framewise/shared/booking.ts'
 import { StudioLists } from '@framewise/shared/studio-lists.ts'
 import { useStudio } from '../data/studio-context.tsx'
@@ -14,6 +14,7 @@ import { Empty, Icon, Tag } from '../ui/icon.tsx'
 import { BookedEvents } from './booked-events.tsx'
 import { EventCard } from './event-card.tsx'
 import { ClientTeam } from './client-team.tsx'
+import { InvoicePrinter, type IssuedDocument } from '../invoices/invoice-printer.ts'
 
 const TABS = ['Overview', 'Events', 'Payments', 'Team', 'Delivery', 'Project', 'Notes'] as const
 
@@ -134,6 +135,28 @@ function Events({ client: c }: { client: Client }) {
 function Payments({ client: c }: { client: Client }) {
   const studio = useStudio()
   const { data } = studio
+  const [documents, setDocuments] = useState<IssuedDocument[]>([])
+  const [documentError, setDocumentError] = useState('')
+  const refreshDocuments = () => studio.api.get<IssuedDocument[]>(`/clients/${c.id}/invoices`).then(setDocuments).catch(e => setDocumentError((e as Error).message))
+  useEffect(() => { refreshDocuments() }, [c.id])
+  const issueReceipt = async (paymentId: string) => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) { studio.toast('Allow pop-ups to print the receipt'); return }
+    try {
+      const receipt = await studio.api.post<IssuedDocument>(`/payments/${paymentId}/receipt`)
+      await refreshDocuments()
+      InvoicePrinter.print(receipt, printWindow)
+    } catch (error) {
+      printWindow.close()
+      studio.toast((error as Error).message)
+    }
+  }
+  const printDocument = async (id: string) => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) { studio.toast('Allow pop-ups to print the receipt'); return }
+    try { InvoicePrinter.print(await studio.api.get<IssuedDocument>(`/invoices/${id}`), printWindow) }
+    catch (error) { printWindow.close(); studio.toast((error as Error).message) }
+  }
   const record = (stage?: string) => studio.open('New payment', <PaymentForm clientId={c.id} stage={stage} />)
   return (
     <div className="client-payment-dashboard">
@@ -147,6 +170,12 @@ function Payments({ client: c }: { client: Client }) {
           <div><small>Received</small><strong>{Format.money(data.paid(c.id))}</strong></div>
           <div><small>Outstanding</small><strong>{Format.money(data.balance(c.id))}</strong></div>
         </div>
+      </section>
+      <section className="panel">
+        <div className="section-header"><h3>Receipts</h3></div>
+        {documentError && <p className="form-error" role="alert">{documentError}</p>}
+        {!documents.length && !documentError && <p className="subtext">No receipts issued yet. Create one from a recorded payment.</p>}
+        {documents.map(doc => <div className="line-items" key={doc.id}><span>{doc.number} · {Format.date(doc.snapshot.date)}</span><button type="button" className="small" onClick={() => printDocument(doc.id)}>Print / Save PDF</button></div>)}
       </section>
       <section className="payment-stages">
         <div className="section-header">
@@ -162,7 +191,7 @@ function Payments({ client: c }: { client: Client }) {
             </summary>
             <div className="payment-stage-body">
               {stage.pending === null ? <p className="subtext">Expected amount not set.</p> : <p className="subtext">Expected {Format.money(stage.target!)} · Pending {Format.money(stage.pending)}</p>}
-              {stage.rows.map(p => <PaymentRow key={p.id} payment={p} />)}
+              {stage.rows.map(p => <PaymentRow key={p.id} payment={p} issueReceipt={() => issueReceipt(p.id)} hasReceipt={documents.some(doc => doc.snapshot.payment && (doc.snapshot.payment as { id?: string }).id === p.id)} />)}
               {!stage.rows.length && <p className="subtext">No payment recorded for this stage.</p>}
               <button type="button" className="small" onClick={() => record(stage.name)}>＋ Record payment</button>
             </div>
@@ -177,7 +206,7 @@ function Payments({ client: c }: { client: Client }) {
   )
 }
 
-function PaymentRow({ payment: p }: { payment: Payment }) {
+function PaymentRow({ payment: p, issueReceipt, hasReceipt }: { payment: Payment; issueReceipt: () => void; hasReceipt: boolean }) {
   const studio = useStudio()
   return (
     <article className="stage-payment-row">
@@ -189,6 +218,7 @@ function PaymentRow({ payment: p }: { payment: Payment }) {
       {p.reference && <p className="subtext">Original invoice reference · {p.reference}</p>}
       {p.notes && <p className="subtext">{p.notes}</p>}
       <div className="payment-document-actions">
+        <button type="button" className="small" onClick={issueReceipt}>{hasReceipt ? 'Reprint receipt' : 'Create receipt'}</button>
         <button type="button" className="small" onClick={() => studio.open('Correct payment', <PaymentForm payment={p} />)}>Edit payment</button>
       </div>
     </article>

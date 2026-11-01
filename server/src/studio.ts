@@ -5,6 +5,7 @@ import { EnquiryService } from './enquiries/enquiry-service.ts'
 import { EventService } from './events/event-service.ts'
 import { ExpenseService } from './expenses/expense-service.ts'
 import { ApiServer } from './http/api-server.ts'
+import { InvoiceService } from './invoices/invoice-service.ts'
 import { SupabaseTokenVerifier } from './http/supabase-token-verifier.ts'
 import { PackageService } from './packages/package-service.ts'
 import { PaymentService } from './payments/payment-service.ts'
@@ -38,6 +39,7 @@ export class Studio {
       tasks: new TaskService(db),
       terms: new TermsService(db),
       paymentSettings: new PaymentSettings(db),
+      invoices: new InvoiceService(db),
     })
   }
 }

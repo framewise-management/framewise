@@ -8,6 +8,7 @@ import { EventService } from '../events/event-service.ts'
 import { PackageService } from '../packages/package-service.ts'
 import { ExpenseService } from '../expenses/expense-service.ts'
 import { PaymentService } from '../payments/payment-service.ts'
+import { InvoiceService } from '../invoices/invoice-service.ts'
 import { ProjectService } from '../projects/project-service.ts'
 import { TaskService } from '../tasks/task-service.ts'
 import { TeamService } from '../team/team-service.ts'
@@ -32,6 +33,7 @@ async function start() {
     tasks: new TaskService(db),
     terms: new TermsService(db),
     paymentSettings: new PaymentSettings(db),
+    invoices: new InvoiceService(db),
   })
   const server = await api.listen(0)
   const base = `http://localhost:${(server.address() as AddressInfo).port}`

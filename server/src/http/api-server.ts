@@ -15,6 +15,7 @@ import { TermsService } from '../terms/terms-service.ts'
 import { PaymentSettings } from '../settings/payment-settings.ts'
 import { Body } from './body.ts'
 import { HttpError } from './http-error.ts'
+import { InvoiceService } from '../invoices/invoice-service.ts'
 import type { TokenVerifier } from './supabase-token-verifier.ts'
 
 export interface ApiServerDeps {
@@ -30,12 +31,13 @@ export interface ApiServerDeps {
   tasks: TaskService
   terms: TermsService
   paymentSettings: PaymentSettings
+  invoices: InvoiceService
 }
 
 export class ApiServer {
   readonly #app: Express
 
-  constructor({ auth, clients, events, enquiries, packages, payments, team, expenses, projects, tasks, terms, paymentSettings }: ApiServerDeps) {
+  constructor({ auth, clients, events, enquiries, packages, payments, team, expenses, projects, tasks, terms, paymentSettings, invoices }: ApiServerDeps) {
     const app = express()
     app.use(express.json({ limit: '1mb' }))
     app.get('/health', (_req, res) => { res.json({ ok: true }) })
@@ -84,6 +86,10 @@ export class ApiServer {
       const body = Body.pick(req.body, ['drive_link', 'items'])
       res.json(await packages.updateDelivery(req.params.id, { ...body, items: body.items === undefined ? undefined : Body.list<StatusEdit>(body.items, 'items') }))
     })
+
+    api.get('/clients/:id/invoices', async (req, res) => { res.json(await invoices.clientDocuments(req.params.id)) })
+    api.post('/payments/:id/receipt', async (req, res) => { res.json(await invoices.issueReceipt(req.params.id)) })
+    api.get('/invoices/:id', async (req, res) => { res.json(await invoices.get(req.params.id)) })
 
     api.get('/payments', async (_req, res) => { res.json(await payments.list()) })
     api.post('/payments', async (req, res) => { res.status(201).json(await payments.create(Body.pick(req.body, PaymentService.editable))) })

@@ -17,6 +17,7 @@ export function PaymentForm({ payment, clientId = '', stage }: { payment?: Payme
   const startStage = payment?.stage ?? stage ?? 'Booking Amount'
   const stages = [...new Set([...PaymentStages.core, startStage, 'Custom'])]
   const [stageChoice, setStageChoice] = useState(startStage)
+  const [createReceipt, setCreateReceipt] = useState(true)
   const packages = data.packagesOf(client)
   const chosenPackage = packages.length === 1 ? packages[0].id : pkg
   const own = (amountOf: (p: Payment) => boolean) => (payment && amountOf(payment) ? payment.amount : 0)
@@ -32,7 +33,15 @@ export function PaymentForm({ payment, clientId = '', stage }: { payment?: Payme
       transaction_reference: fd.get('transaction_reference') || null, notes: fd.get('notes') || null,
       ...(payment ? { invoice_requested: fd.get('invoice_requested') === 'Yes' } : {}),
     }
-    await studio.save(() => (payment ? studio.api.patch(`/payments/${payment.id}`, body) : studio.api.post('/payments', body)), payment ? 'Payment corrected' : 'Payment recorded')
+    const saved = await studio.api[payment ? 'patch' : 'post']<Payment>(payment ? `/payments/${payment.id}` : '/payments', body)
+    await studio.save(() => Promise.resolve(saved), payment ? 'Payment corrected' : 'Payment recorded')
+    if (createReceipt && !payment) {
+      try {
+        await studio.save(() => studio.api.post(`/payments/${saved.id}/receipt`), 'Receipt issued')
+      } catch {
+        studio.toast('Payment recorded; receipt could not be issued. Retry from Payments.')
+      }
+    }
   })
 
   const hint = !client
@@ -57,6 +66,7 @@ export function PaymentForm({ payment, clientId = '', stage }: { payment?: Payme
         <Field name="transaction_reference" label="Transaction reference" value={payment?.transaction_reference} placeholder="UPI / bank transaction ID (optional)" />
         <Field name="method" label="Method" value={payment?.method ?? 'UPI'} options={StudioLists.paymentMethods} />
         {payment && <Field name="invoice_requested" label="Previously sent invoice" value={payment.invoice_requested ? 'Yes' : 'No'} options={['No', 'Yes']} />}
+        {!payment && <label className="wide"><input type="checkbox" checked={createReceipt} onChange={e => setCreateReceipt(e.target.checked)} /> Create receipt after recording payment</label>}
         <Field name="notes" label="Payment notes" value={payment?.notes} type="textarea" />
         <p className="note wide">{hint}</p>
       </div>
