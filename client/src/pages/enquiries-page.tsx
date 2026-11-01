@@ -11,7 +11,7 @@ export function EnquiriesPage() {
   const studio = useStudio()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
-  const isClosed = (q: Enquiry) => !!q.client_id || ['Booked', 'Confirmed', 'Canceled', 'Lost'].includes(q.status)
+  const isClosed = (q: Enquiry) => ['Booked', 'Confirmed', 'Canceled', 'Lost'].includes(q.status)
   const rows = studio.data.enquiries.filter(q => (filter === 'All' || (filter === 'Closed' ? isClosed(q) : !isClosed(q))) && JSON.stringify(q).toLowerCase().includes(search.toLowerCase()))
   return (
     <>
@@ -56,7 +56,7 @@ function EnquiryCard({ enquiry: q }: { enquiry: Enquiry }) {
       <div className="line-items"><span>{q.package_name}</span><strong>{Format.money(Pricing.finalQuote(q.price, q.discount))}</strong></div>
       <div className="field" style={{ marginTop: 16 }}>
         <label>Status</label>
-        <select value={q.status} disabled={!!q.client_id} onChange={e => setStatus(e.target.value)}>{Booking.enquiryStatuses.map(s => <option key={s}>{s}</option>)}</select>
+        <select value={q.status} onChange={e => setStatus(e.target.value)}>{Booking.enquiryStatuses.map(s => <option key={s}>{s}</option>)}</select>
       </div>
       <p>Follow-up · {Format.date(q.followup)}</p>
       <div className="actions">

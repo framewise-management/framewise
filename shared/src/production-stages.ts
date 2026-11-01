@@ -9,6 +9,12 @@ export class ProductionStages {
   // projects saved before custom stages existed have no stageNames
   static readonly legacy: readonly string[] = ['Shoot Completed', 'Data Backup', 'Photo Culling', 'Photo Editing', 'Client Selection', 'Album Design', 'Album Approval', 'Film Editing', 'Final Delivery', 'Completed']
 
+  static forBooking(): string[] { return ['Upcoming', ...ProductionStages.defaults] }
+
+  static validStart(stages: readonly string[]): boolean {
+    return stages[0] === 'Shoot Completed' || (stages[0] === 'Upcoming' && stages[1] === 'Shoot Completed')
+  }
+
   static of(p: ProductionProject): readonly string[] {
     return p.stageNames || ProductionStages.legacy
   }

@@ -14,9 +14,14 @@ export function EnquiryForm({ enquiry }: { enquiry?: Enquiry }) {
       budget: fd.get('budget'), phone: fd.get('phone') || null, email: fd.get('email') || null, wedding_date: fd.get('wedding_date') || null,
       city: fd.get('city') || null, price: Number(fd.get('price') || 0), discount: Number(fd.get('discount') || 0),
       followup: fd.get('followup') || null, notes: fd.get('notes') || null,
-      ...(v.client_id ? {} : { status: fd.get('status') }),
+      status: fd.get('status'),
     }
-    await studio.save(() => (enquiry ? studio.api.patch(`/enquiries/${enquiry.id}`, body) : studio.api.post('/enquiries', body)), enquiry ? 'Enquiry saved' : 'Enquiry added')
+    let created: Enquiry | undefined
+    await studio.save(async () => {
+      if (enquiry) await studio.api.patch(`/enquiries/${enquiry.id}`, body)
+      else created = await studio.api.post<Enquiry>('/enquiries', body)
+    }, enquiry ? 'Enquiry saved' : 'Enquiry and client created')
+    if (created?.client_id) location.hash = '#/clients/' + created.client_id
   })
   return (
     <form autoComplete="off" onSubmit={onSubmit}>
@@ -33,7 +38,7 @@ export function EnquiryForm({ enquiry }: { enquiry?: Enquiry }) {
         <Field name="city" label="City" value={v.city} />
         <Field name="price" label="Booking amount (₹)" value={v.price ?? 0} type="number" required />
         <Field name="discount" label="Discount (₹)" value={v.discount ?? 0} type="number" required />
-        <Field name="status" label="Status" value={v.status || 'New'} options={Booking.enquiryStatuses} disabled={!!v.client_id} />
+        <Field name="status" label="Status" value={v.status || 'New'} options={Booking.enquiryStatuses} />
         <Field name="followup" label="Next follow-up" value={v.followup ?? (enquiry ? '' : studio.today)} type="date" />
         <Field name="notes" label="Notes" value={v.notes} type="textarea" />
       </div>

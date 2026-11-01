@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { PgliteDatabase } from '../db/pglite-database.ts'
 import { EnquiryService } from './enquiry-service.ts'
 
-test('a confirmed enquiry converts into one client with its details', async () => {
+test('a legacy confirmed enquiry converts into one client with its details', async () => {
   const db = await PgliteDatabase.create()
   const enquiries = new EnquiryService(db)
-  const q = await enquiries.create({ name: 'Meera', city: 'Nashik', followup: '2026-11-01', price: 90000, discount: 10000, status: 'Contacted', package_name: 'Gold' })
+  const [[q]] = await db.apply([{ op: 'insert', table: 'enquiries', row: { name: 'Meera', city: 'Nashik', followup: '2026-11-01', price: 90000, discount: 10000, status: 'Contacted', package_name: 'Gold' } }])
   await assert.rejects(enquiries.convert(q.id as string), /Confirm the enquiry first/)
   await enquiries.update(q.id as string, { status: 'Confirmed' })
   const client = await enquiries.convert(q.id as string)
@@ -14,6 +14,22 @@ test('a confirmed enquiry converts into one client with its details', async () =
   assert.equal((await enquiries.convert(q.id as string)).id, client.id)
   assert.equal((await db.select('clients')).length, 1)
   assert.equal((await enquiries.list())[0].client_id, client.id)
+})
+
+test('new enquiries immediately create a tentative client without requiring conversion', async () => {
+  const db = await PgliteDatabase.create()
+  try {
+    const enquiries = new EnquiryService(db)
+    const q = await enquiries.create({ name: 'Mira', phone: '1234567890', city: 'Pune', price: 1000, status: 'New' })
+    const client = await enquiries.convert(String(q.id))
+    assert.equal(client.id, q.client_id)
+    assert.equal(client.status, 'Tentative')
+    assert.equal(client.address, 'Pune')
+    assert.equal(client.phone, '1234567890')
+    assert.equal((await db.select('clients')).length, 1)
+    await assert.rejects(enquiries.create({ name: 'Fail', status: 'Invalid' }))
+    assert.equal((await db.select('clients')).length, 1)
+  } finally { await db.pg.close() }
 })
 
 test('enquiries need a name and a valid discount', async () => {

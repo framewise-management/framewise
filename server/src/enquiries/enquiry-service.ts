@@ -19,7 +19,15 @@ export class EnquiryService {
 
   async create(row: Row): Promise<Row> {
     check(row, { price: 0, discount: 0 })
-    const [[created]] = await this.#db.apply([{ op: 'insert', table: 'enquiries', row: { ...row, name: String(row.name || '').trim() } }])
+    const clientId = crypto.randomUUID()
+    const [, [created]] = await this.#db.apply([
+      { op: 'insert', table: 'clients', row: {
+        id: clientId, name: String(row.name || '').trim(), bride: row.bride, groom: row.groom, phone: row.phone, email: row.email,
+        address: row.city, lead_source: row.lead_source, budget: row.budget, wedding_date: row.wedding_date,
+        package_name: row.package_name, price: row.price ?? 0, discount: row.discount ?? 0, status: 'Tentative', notes: row.notes,
+      } },
+      { op: 'insert', table: 'enquiries', row: { ...row, name: String(row.name || '').trim(), client_id: clientId } },
+    ])
     return created
   }
 
