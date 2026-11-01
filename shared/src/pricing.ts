@@ -35,6 +35,11 @@ export class Pricing {
     return price - discount
   }
 
+  // a setup package priced from its services; rounded to paise so float sums like 0.1 + 0.2 stay exact
+  static servicesTotal(prices: readonly number[]): number {
+    return Math.round(prices.reduce((n, p) => n + p, 0) * 100) / 100
+  }
+
   // the one place that chooses between the three pricing models: packages win, then per-day quotes, then the client's amount
   static quote(client: QuotedClient, packages: readonly PricedPackage[], events: readonly QuotedEvent[]): number {
     if (packages.length) return packages.reduce((n, p) => n + Pricing.finalQuote(p.price, p.discount), 0)

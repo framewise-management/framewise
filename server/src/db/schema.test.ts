@@ -224,6 +224,30 @@ test('the studios migration moves the existing studio, its numbering and its WC-
   assert.equal(await one(pg, `insert into invoices (studio_id, client_id, document_kind, payment_id, snapshot) values ($1, $2, 'receipt', $3, '{}') returning number as id`, [id, clients[0], next]), 'R-0002')
 })
 
+test('the enquiry statuses migration folds old statuses into Open, Booked and Canceled', async () => {
+  const pg = new PGlite()
+  await pg.exec('create role anon; create role authenticated; create role service_role;')
+  const files = (await readdir(MIGRATIONS)).filter(f => f.endsWith('.sql')).sort()
+  const at = files.indexOf('20261104000000_enquiry_statuses.sql')
+  for (const file of files.slice(0, at)) await pg.exec(await readFile(new URL(file, MIGRATIONS), 'utf8'))
+
+  const studio = await one(pg, 'select id from studios')
+  const old = ['New', 'Contacted', 'Follow-up', 'Quote Sent', 'Negotiation', 'Tentative', 'Booked', 'Confirmed', 'Canceled', 'Lost']
+  for (const status of old) await pg.query(`insert into enquiries (studio_id, name, status) values ($1, $2, $2)`, [studio, status])
+  const before = (await pg.query('select name, updated_at from enquiries order by name')).rows
+
+  await pg.exec(await readFile(new URL(files[at], MIGRATIONS), 'utf8'))
+
+  const after = Object.fromEntries((await pg.query<{ name: string; status: string }>('select name, status from enquiries')).rows.map(r => [r.name, r.status]))
+  assert.deepEqual(after, {
+    New: 'Open', Contacted: 'Open', 'Follow-up': 'Open', 'Quote Sent': 'Open', Negotiation: 'Open', Tentative: 'Open',
+    Booked: 'Booked', Confirmed: 'Booked', Canceled: 'Canceled', Lost: 'Canceled',
+  })
+  assert.deepEqual((await pg.query('select name, updated_at from enquiries order by name')).rows, before)
+  assert.equal(await one(pg, `insert into enquiries (studio_id, name) values ($1, 'D') returning status as id`, [studio]), 'Open')
+  await rejects(pg, `insert into enquiries (studio_id, name, status) values ($1, 'E', 'New')`, 'check', [studio])
+})
+
 const MIGRATIONS = new URL('../../../supabase/migrations/', import.meta.url)
 
 // raw inserts in these tests belong to the first studio unless they name another

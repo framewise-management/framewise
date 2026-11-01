@@ -46,7 +46,7 @@ export class EnquiryService {
   async convert(id: string): Promise<Row> {
     const q = await this.#enquiry(id)
     if (q.client_id) return (await this.#db.select('clients', { id: q.client_id }))[0]
-    if (!['Confirmed', 'Booked'].includes(q.status)) throw new HttpError(400, 'Confirm the enquiry first')
+    if (q.status !== 'Booked') throw new HttpError(400, 'Mark the enquiry Booked first')
     const client = {
       id: crypto.randomUUID(), name: q.name, bride: q.bride, groom: q.groom, lead_source: q.lead_source, budget: q.budget,
       price: q.price, discount: q.discount, phone: q.phone, email: q.email, address: q.city, wedding_date: q.wedding_date,

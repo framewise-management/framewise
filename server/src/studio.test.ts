@@ -21,7 +21,7 @@ test('a studio cannot list, read, change, delete or link another studio’s reco
   const payment = await a.payments.create({ client_id: client.id, package_id: pkg.id, amount: 1000, paid_on: '2026-10-24', stage: 'Booking' })
   const receipt = await a.invoices.issueReceipt(payment.id as string)
   await a.payments.setStagePlan(client.id as string, { 'Booking Amount': 1000 })
-  const enquiry = await a.enquiries.create({ name: 'Ravi', status: 'Confirmed' })
+  const enquiry = await a.enquiries.create({ name: 'Ravi', status: 'Booked' })
   const member = await a.team.addMember({ name: 'Meera', role: 'Photographer' })
   const assignment = await a.team.assign({ event_id: event.id, member_id: member.id, service: 'Candid', charge: 0, paid: 0 })
   await a.events.update(event.id, { status: 'Shoot Completed' })
@@ -29,6 +29,8 @@ test('a studio cannot list, read, change, delete or link another studio’s reco
   const task = await a.tasks.create({ title: 'Call', due: '2026-10-30', event_id: event.id })
   const expense = await a.expenses.create({ title: 'Fuel', amount: 10, spent_on: '2026-10-24', client_id: client.id, event_id: event.id })
   const term = await a.terms.create({ title: 'Delivery', body: 'Within 30 days' })
+  const service = await a.serviceCatalog.create({ name: 'Drone', price: 15000 })
+  const template = await a.packageTemplates.create({ name: 'Gold', use_service_prices: true, service_ids: [service.id] })
   const before = await everything(a, client.id as string)
   for (const [list, rows] of Object.entries(before)) if (list !== 'deleted') assert.ok(rows.length, `studio A has ${list}`)
 
@@ -72,6 +74,11 @@ test('a studio cannot list, read, change, delete or link another studio’s reco
     ['expenses.remove', () => b.expenses.remove(id(expense))],
     ['terms.update', () => b.terms.update(id(term), { title: 'X' })],
     ['terms.remove', () => b.terms.remove(id(term))],
+    ['packageTemplates.update', () => b.packageTemplates.update(id(template), { name: 'X' })],
+    ['packageTemplates.remove', () => b.packageTemplates.remove(id(template))],
+    ['packageTemplates.create with their service', () => b.packageTemplates.create({ name: 'X', price: 1, service_ids: [id(service)] })],
+    ['serviceCatalog.update', () => b.serviceCatalog.update(id(service), { name: 'X' })],
+    ['serviceCatalog.remove', () => b.serviceCatalog.remove(id(service))],
   ]
   for (const [name, attempt] of attempts) await assert.rejects(attempt(), (e: Error) => e instanceof HttpError || e instanceof DatabaseError || assert.fail(`${name}: ${e}`))
 
@@ -79,7 +86,7 @@ test('a studio cannot list, read, change, delete or link another studio’s reco
   assert.deepEqual(await everything(b, client.id as string), EMPTY)
 })
 
-const EMPTY = { clients: [], deleted: [], events: [], enquiries: [], packages: [], payments: [], stagePlans: [], team: [], assignments: [], expenses: [], projects: [], tasks: [], terms: [], documents: [] }
+const EMPTY = { clients: [], deleted: [], events: [], enquiries: [], packages: [], payments: [], stagePlans: [], team: [], assignments: [], expenses: [], projects: [], tasks: [], terms: [], packageTemplates: [], serviceCatalog: [], documents: [] }
 
 async function everything(s: StudioServices, clientId: string) {
   return {
@@ -96,6 +103,8 @@ async function everything(s: StudioServices, clientId: string) {
     projects: await s.projects.list(),
     tasks: await s.tasks.list(),
     terms: await s.terms.list(),
+    packageTemplates: await s.packageTemplates.list(),
+    serviceCatalog: await s.serviceCatalog.list(),
     documents: await s.invoices.clientDocuments(clientId),
   }
 }

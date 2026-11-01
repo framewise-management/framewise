@@ -11,8 +11,7 @@ export function EnquiriesPage() {
   const studio = useStudio()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
-  const isClosed = (q: Enquiry) => ['Booked', 'Confirmed', 'Canceled', 'Lost'].includes(q.status)
-  const rows = studio.data.enquiries.filter(q => (filter === 'All' || (filter === 'Closed' ? isClosed(q) : !isClosed(q))) && JSON.stringify(q).toLowerCase().includes(search.toLowerCase()))
+  const rows = studio.data.enquiries.filter(q => (filter === 'All' || q.status === filter) && JSON.stringify(q).toLowerCase().includes(search.toLowerCase()))
   return (
     <>
       <div className="heading">
@@ -21,11 +20,11 @@ export function EnquiriesPage() {
       </div>
       <div className="toolbar">
         <input autoComplete="off" aria-label="Search enquiries" placeholder="Search enquiries" value={search} onChange={e => setSearch(e.target.value)} />
-        <div className="tabs" aria-label="Enquiry filters">{['All', 'Recent', 'Closed'].map(s => <button key={s} className={filter === s ? 'active' : ''} aria-pressed={filter === s} onClick={() => setFilter(s)}>{s}</button>)}</div>
+        <div className="tabs" aria-label="Enquiry filters">{['All', ...Booking.enquiryStatuses].map(s => <button key={s} className={filter === s ? 'active' : ''} aria-pressed={filter === s} onClick={() => setFilter(s)}>{s}</button>)}</div>
       </div>
       <div className="cards">
         {rows.map(q => <EnquiryCard key={q.id} enquiry={q} />)}
-        {!rows.length && <Empty title="No enquiries here" text={search ? "Try a different search." : filter === "Recent" ? "Open enquiries will appear here." : filter === "Closed" ? "Closed enquiries will appear here." : "Add an enquiry to begin the workflow."} />}
+        {!rows.length && <Empty title="No enquiries here" text={search ? "Try a different search." : filter !== "All" ? `${filter} enquiries will appear here.` : "Add an enquiry to begin the workflow."} />}
       </div>
     </>
   )
@@ -63,7 +62,7 @@ function EnquiryCard({ enquiry: q }: { enquiry: Enquiry }) {
         <button className="small" onClick={() => studio.open('Edit enquiry', <EnquiryForm enquiry={q} />)}>Edit details</button>
         {q.client_id
           ? <a className="linked" href={'#/clients/' + q.client_id}>Open client</a>
-          : (q.status === 'Confirmed' || q.status === 'Booked') && <button className="primary small" onClick={convert}>Create client</button>}
+          : q.status === 'Booked' && <button className="primary small" onClick={convert}>Create client</button>}
         <button className="danger small" onClick={remove}>Delete</button>
       </div>
     </article>

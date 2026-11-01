@@ -9,6 +9,8 @@ import { ApiServer, type StudioServices } from './http/api-server.ts'
 import { InvoiceService } from './invoices/invoice-service.ts'
 import { SupabaseTokenVerifier } from './http/supabase-token-verifier.ts'
 import { PackageService } from './packages/package-service.ts'
+import { PackageTemplateService } from './package-templates/package-template-service.ts'
+import { ServiceCatalog } from './service-catalog/service-catalog.ts'
 import { PaymentService } from './payments/payment-service.ts'
 import { ProjectService } from './projects/project-service.ts'
 import { TaskService } from './tasks/task-service.ts'
@@ -16,6 +18,7 @@ import { TeamService } from './team/team-service.ts'
 import { TermsService } from './terms/terms-service.ts'
 import { PaymentSettings } from './settings/payment-settings.ts'
 import { StudioProfile } from './studios/studio-profile.ts'
+import { StudioOnboarding } from './studios/studio-onboarding.ts'
 import { QuoteService } from './quotes/quote-service.ts'
 
 // wiring shared by local start-up (main.ts), the Vercel function (vercel.ts) and the create-studio script
@@ -24,6 +27,7 @@ export class Studio {
     const supabase = Studio.supabase(env)
     return new ApiServer({
       auth: new SupabaseTokenVerifier(supabase),
+      onboarding: new StudioOnboarding(supabase),
       servicesFor: studioId => Studio.services(new SupabaseDatabase(supabase, studioId)),
     })
   }
@@ -40,6 +44,7 @@ export class Studio {
   static services(db: Database, today?: () => string): StudioServices {
     const events = new EventService(db, today)
     const packages = new PackageService(db)
+    const serviceCatalog = new ServiceCatalog(db)
     return {
       clients: new ClientService(db, events, packages),
       quotes: new QuoteService(db),
@@ -52,6 +57,8 @@ export class Studio {
       projects: new ProjectService(db),
       tasks: new TaskService(db),
       terms: new TermsService(db),
+      packageTemplates: new PackageTemplateService(db, serviceCatalog),
+      serviceCatalog,
       paymentSettings: new PaymentSettings(db),
       invoices: new InvoiceService(db),
       profile: new StudioProfile(db),

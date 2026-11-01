@@ -96,7 +96,7 @@ test('booking rolls back if project creation fails', async () => {
 
 test('public routes work without staff login and expose only the quote snapshot', async () => {
   const db = await PgliteDatabase.create()
-  const api = new ApiServer({ auth: { verify: async () => null }, servicesFor: id => Studio.services(db.forStudio(id)) })
+  const api = new ApiServer({ auth: { verify: async () => null }, onboarding: { createForUser: async () => assert.fail('no sign-up here') }, servicesFor: id => Studio.services(db.forStudio(id)) })
   const server = await api.listen(0)
   try {
     const { quote, client } = await setup(db)
