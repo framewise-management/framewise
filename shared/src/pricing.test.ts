@@ -55,3 +55,9 @@ function legacyQuote(client: QuotedClient, packages: PricedPackage[], events: Qu
   store.data.events = events.map((e, i) => ({ id: 'e' + i, client: 'c1', ...e }))
   return store.quote('c1')
 }
+
+test('a package priced from its services is their total, exact to the paisa', () => {
+  assert.equal(Pricing.servicesTotal([40000, 15000]), 55000)
+  assert.equal(Pricing.servicesTotal([0.1, 0.2]), 0.3)
+  assert.equal(Pricing.servicesTotal([]), 0)
+})

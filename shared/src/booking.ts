@@ -3,7 +3,7 @@ export type CalendarState = 'Canceled' | 'Lost' | 'Confirmed' | 'Tentative'
 export class Booking {
   static readonly statuses: readonly string[] = ['Quote Sent', 'Booked', 'Negotiation', 'Tentative', 'Canceled', 'Lost']
   static readonly clientStatuses: readonly string[] = [...Booking.statuses, 'Confirmed', 'Completed']
-  static readonly enquiryStatuses: readonly string[] = ['New', 'Contacted', 'Follow-up', ...Booking.statuses, 'Confirmed']
+  static readonly enquiryStatuses: readonly string[] = ['Open', 'Booked', 'Canceled']
   static readonly closed: readonly string[] = ['Canceled', 'Lost']
   static readonly won: readonly string[] = ['Booked', 'Confirmed', 'Completed']
 

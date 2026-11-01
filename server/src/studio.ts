@@ -9,6 +9,8 @@ import { ApiServer, type StudioServices } from './http/api-server.ts'
 import { InvoiceService } from './invoices/invoice-service.ts'
 import { SupabaseTokenVerifier } from './http/supabase-token-verifier.ts'
 import { PackageService } from './packages/package-service.ts'
+import { PackageTemplateService } from './package-templates/package-template-service.ts'
+import { ServiceCatalog } from './service-catalog/service-catalog.ts'
 import { PaymentService } from './payments/payment-service.ts'
 import { ProjectService } from './projects/project-service.ts'
 import { TaskService } from './tasks/task-service.ts'
@@ -42,6 +44,7 @@ export class Studio {
   static services(db: Database, today?: () => string): StudioServices {
     const events = new EventService(db, today)
     const packages = new PackageService(db)
+    const serviceCatalog = new ServiceCatalog(db)
     return {
       clients: new ClientService(db, events, packages),
       quotes: new QuoteService(db),
@@ -54,6 +57,8 @@ export class Studio {
       projects: new ProjectService(db),
       tasks: new TaskService(db),
       terms: new TermsService(db),
+      packageTemplates: new PackageTemplateService(db, serviceCatalog),
+      serviceCatalog,
       paymentSettings: new PaymentSettings(db),
       invoices: new InvoiceService(db),
       profile: new StudioProfile(db),

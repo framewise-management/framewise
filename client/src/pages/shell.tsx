@@ -13,6 +13,8 @@ import { TeamManagement } from './team-management.tsx'
 import { ProjectsPage } from './projects-page.tsx'
 import { TermsPage } from './terms-page.tsx'
 import { PaymentSettingsPage } from './payment-settings-page.tsx'
+import { PackageTemplatesPage } from './package-templates-page.tsx'
+import { ServicesPage } from './services-page.tsx'
 
 const NAV: [route: string, label: string, icon: IconName][] = [
   ['dashboard', 'Home', 'home'], ['clients', 'Clients', 'clients'], ['enquiries', 'Enquiries', 'enquiries'], ['calendar', 'Calendar', 'calendar'],
@@ -24,7 +26,7 @@ const PRIMARY = ['dashboard', 'clients', 'calendar', 'tasks']
 export function Shell({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   const studio = useStudio()
   const [route, id] = useRoute()
-  const title = NAV.find(n => n[0] === route)?.[1] ?? (route === 'more' ? 'More' : route === 'team' ? 'Team Management' : route === 'terms' ? 'Terms & Conditions' : route === 'payment-settings' ? 'Payment & Invoice' : 'Home')
+  const title = NAV.find(n => n[0] === route)?.[1] ?? (route === 'more' ? 'More' : route === 'team' ? 'Team Management' : route === 'terms' ? 'Terms & Conditions' : route === 'payment-settings' ? 'Payment & Invoice' : route === 'setup-packages' ? 'Packages' : route === 'setup-services' ? 'Services' : 'Home')
   const quick = () => studio.open('Quick Add', (
     <div className="quick-list">
       {([['New enquiry', 'Start a conversation', 'enquiries', <EnquiryForm />], ['New client', 'Create a couple’s profile', 'clients', <NewClientForm />], ['Add payment', 'Update the balance', 'finance', <PaymentForm />]] as const)
@@ -38,7 +40,7 @@ export function Shell({ email, onSignOut }: { email: string; onSignOut: () => vo
       <aside className="sidebar">
         <a className="brand" href="#/dashboard"><span className="brand-mark" aria-hidden="true">F</span><span><strong>{studio.data.company}</strong><small>STUDIO WORKSPACE</small></span></a>
         <nav aria-label="Desktop navigation">
-          {NAV.map(([r, label, icon]) => <a key={r} href={'#/' + r} className={r === route || (r === 'setup' && ['team', 'terms', 'payment-settings'].includes(route)) ? 'active' : ''} aria-current={r === route ? 'page' : undefined}><Icon name={icon} />{label}</a>)}
+          {NAV.map(([r, label, icon]) => <a key={r} href={'#/' + r} className={r === route || (r === 'setup' && ['team', 'terms', 'payment-settings', 'setup-packages', 'setup-services'].includes(route)) ? 'active' : ''} aria-current={r === route ? 'page' : undefined}><Icon name={icon} />{label}</a>)}
         </nav>
         <div className="sidebar-foot">{email}<br /><button className="small" onClick={onSignOut}>Sign out</button></div>
       </aside>
@@ -48,7 +50,6 @@ export function Shell({ email, onSignOut }: { email: string; onSignOut: () => vo
           <span className="crumb">{title}</span>
           <div className="topbar-actions">
             <span className="subtext desktop-date">{Format.date(studio.today)}</span>
-            <button className="primary top-quick" onClick={quick}><span aria-hidden="true">＋</span><span>Quick Add</span></button>
           </div>
         </header>
         <div className={'content' + (route === 'clients' && id ? ' profile-content' : route === 'calendar' ? ' calendar-content' : '')}>
@@ -75,8 +76,10 @@ function Page({ route, id, onSignOut }: { route: string; id?: string; onSignOut:
   if (route === 'team') return <TeamManagement />
   if (route === 'terms') return <TermsPage />
   if (route === 'payment-settings') return <PaymentSettingsPage />
+  if (route === 'setup-packages') return <PackageTemplatesPage />
+  if (route === 'setup-services') return <ServicesPage />
   if (route === 'projects') return <ProjectsPage />
-  if (route === 'setup') return <><div className="heading workspace-heading"><div><span className="workspace-kicker">Your workspace</span><h1>Setup</h1><p className="subtext">Manage your team and studio details.</p></div></div><div className="workspace-list-heading"><h2>Studio settings</h2></div><div className="more-list setup-list"><a href="#/team" className="more-item"><span className="more-icon"><Icon name="team" /></span><span><strong>Team Management</strong><small>Add people and manage their roles</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/payment-settings" className="more-item"><span className="more-icon"><Icon name="finance" /></span><span><strong>Payment &amp; Invoice</strong><small>Payment preferences and invoice numbering</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/terms" className="more-item"><span className="more-icon"><Icon name="note" /></span><span><strong>Terms &amp; Conditions</strong><small>Manage your clause library</small></span><span className="more-chevron" aria-hidden="true">›</span></a></div></>
+  if (route === 'setup') return <><div className="heading workspace-heading"><div><span className="workspace-kicker">Your workspace</span><h1>Setup</h1><p className="subtext">Manage your team and studio details.</p></div></div><div className="workspace-list-heading"><h2>Studio settings</h2></div><div className="more-list setup-list"><a href="#/team" className="more-item"><span className="more-icon"><Icon name="team" /></span><span><strong>Team Management</strong><small>Add people and manage their roles</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/payment-settings" className="more-item"><span className="more-icon"><Icon name="finance" /></span><span><strong>Payment &amp; Invoice</strong><small>Payment preferences and invoice numbering</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/terms" className="more-item"><span className="more-icon"><Icon name="note" /></span><span><strong>Terms &amp; Conditions</strong><small>Manage your clause library</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/setup-packages" className="more-item"><span className="more-icon"><Icon name="package" /></span><span><strong>Packages</strong><small>Reusable packages with their price</small></span><span className="more-chevron" aria-hidden="true">›</span></a><a href="#/setup-services" className="more-item"><span className="more-icon"><Icon name="services" /></span><span><strong>Services</strong><small>What you offer, with its price</small></span><span className="more-chevron" aria-hidden="true">›</span></a></div></>
   const label = route === 'team' ? 'Team Management' : NAV.find(n => n[0] === route)?.[1]
   if (!label) return <Empty title="Page not found" text="Return to the studio workspace."><a className="linked" href="#/dashboard">Home</a></Empty>
   return (

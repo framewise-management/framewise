@@ -26,6 +26,45 @@ async function start() {
   return { server, call, signups }
 }
 
+test('setup packages round-trip over http and stay inside their studio', async () => {
+  const { server, call } = await start()
+  try {
+    const candid = (await call('POST', '/api/services', { name: 'Candid', price: 40000 })).body
+    const drone = (await call('POST', '/api/services', { name: 'Drone', price: 15000 })).body
+    const created = await call('POST', '/api/package-templates', { name: 'Gold', use_service_prices: true, service_ids: [candid.id, drone.id], price: 1 })
+    assert.deepEqual([created.status, created.body.name, created.body.price, created.body.services.length], [201, 'Gold', 55000, 2])
+    assert.equal((await call('PATCH', `/api/package-templates/${created.body.id}`, { use_service_prices: false, price: 50000 })).body.price, 50000)
+    assert.deepEqual(await call('POST', '/api/package-templates', { name: 'X', price: 1, description: 'x' }), { status: 400, body: { error: 'Unknown fields: description' } })
+    assert.deepEqual(await call('POST', '/api/package-templates', { name: 'X', price: 1, studio_id: 'x' }), { status: 400, body: { error: 'Unknown fields: studio_id' } })
+    assert.equal((await call('PATCH', `/api/package-templates/${created.body.id}`, { active: false })).body.active, false)
+    assert.deepEqual((await call('GET', '/api/package-templates', undefined, 'other')).body, [])
+    assert.equal((await call('PATCH', `/api/package-templates/${created.body.id}`, { name: 'Mine' }, 'other')).status, 404)
+    assert.equal((await call('DELETE', `/api/package-templates/${created.body.id}`, undefined, 'other')).status, 404)
+    assert.equal((await call('DELETE', `/api/package-templates/${created.body.id}`)).status, 204)
+    assert.deepEqual((await call('GET', '/api/package-templates')).body, [])
+  } finally {
+    server.close()
+  }
+})
+
+test('setup services round-trip over http and stay inside their studio', async () => {
+  const { server, call } = await start()
+  try {
+    const created = await call('POST', '/api/services', { name: 'Drone', tag: 'Videography', price: 15000 })
+    assert.deepEqual([created.status, created.body.name, created.body.tag, created.body.price, created.body.active], [201, 'Drone', 'Videography', 15000, true])
+    assert.deepEqual(await call('POST', '/api/services', { name: 'X', price: 1, studio_id: 'x' }), { status: 400, body: { error: 'Unknown fields: studio_id' } })
+    assert.deepEqual(await call('POST', '/api/services', { name: 'X', price: 1, description: 'x' }), { status: 400, body: { error: 'Unknown fields: description' } })
+    assert.equal((await call('PATCH', `/api/services/${created.body.id}`, { active: false })).body.active, false)
+    assert.deepEqual((await call('GET', '/api/services', undefined, 'other')).body, [])
+    assert.equal((await call('PATCH', `/api/services/${created.body.id}`, { name: 'Mine' }, 'other')).status, 404)
+    assert.equal((await call('DELETE', `/api/services/${created.body.id}`, undefined, 'other')).status, 404)
+    assert.equal((await call('DELETE', `/api/services/${created.body.id}`)).status, 204)
+    assert.deepEqual((await call('GET', '/api/services')).body, [])
+  } finally {
+    server.close()
+  }
+})
+
 test('a login without a studio can create one; nobody else can', async () => {
   const { server, call, signups } = await start()
   try {

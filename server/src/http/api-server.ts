@@ -13,6 +13,8 @@ import { ProjectService } from '../projects/project-service.ts'
 import { TaskService } from '../tasks/task-service.ts'
 import { TeamService } from '../team/team-service.ts'
 import { TermsService } from '../terms/terms-service.ts'
+import { PackageTemplateService } from '../package-templates/package-template-service.ts'
+import { ServiceCatalog } from '../service-catalog/service-catalog.ts'
 import { PaymentSettings } from '../settings/payment-settings.ts'
 import { StudioProfile } from '../studios/studio-profile.ts'
 import type { StudioOnboarding } from '../studios/studio-onboarding.ts'
@@ -41,6 +43,8 @@ export interface StudioServices {
   projects: ProjectService
   tasks: TaskService
   terms: TermsService
+  packageTemplates: PackageTemplateService
+  serviceCatalog: ServiceCatalog
   paymentSettings: PaymentSettings
   invoices: InvoiceService
   profile: StudioProfile
@@ -89,6 +93,16 @@ export class ApiServer {
     api.post('/terms', async (req, res) => { res.status(201).json(await services(res).terms.create(Body.pick(req.body, ['title', 'body']))) })
     api.patch('/terms/:id', async (req, res) => { res.json(await services(res).terms.update(req.params.id, Body.pick(req.body, ['title', 'body', 'active']))) })
     api.delete('/terms/:id', async (req, res) => { await services(res).terms.remove(req.params.id); res.status(204).end() })
+
+    api.get('/package-templates', async (_req, res) => { res.json(await services(res).packageTemplates.list()) })
+    api.post('/package-templates', async (req, res) => { res.status(201).json(await services(res).packageTemplates.create(Body.pick(req.body, PackageTemplateService.editable))) })
+    api.patch('/package-templates/:id', async (req, res) => { res.json(await services(res).packageTemplates.update(req.params.id, Body.pick(req.body, PackageTemplateService.editable))) })
+    api.delete('/package-templates/:id', async (req, res) => { await services(res).packageTemplates.remove(req.params.id); res.status(204).end() })
+
+    api.get('/services', async (_req, res) => { res.json(await services(res).serviceCatalog.list()) })
+    api.post('/services', async (req, res) => { res.status(201).json(await services(res).serviceCatalog.create(Body.pick(req.body, ServiceCatalog.editable))) })
+    api.patch('/services/:id', async (req, res) => { res.json(await services(res).serviceCatalog.update(req.params.id, Body.pick(req.body, ServiceCatalog.editable))) })
+    api.delete('/services/:id', async (req, res) => { await services(res).serviceCatalog.remove(req.params.id); res.status(204).end() })
 
     api.get('/clients/:id/quotes', async (req, res) => { res.json(await services(res).quotes.list(req.params.id)) })
     api.post('/clients/:id/quotes', async (req, res) => { res.status(201).json(await services(res).quotes.create(req.params.id)) })

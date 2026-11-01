@@ -1,5 +1,7 @@
 export class StudioLists {
   static readonly services: readonly string[] = ['Cinematic', 'Candid', 'Traditional Photo', 'Traditional Video', 'Drone']
+  // suggestions only: a service's tag is free text
+  static readonly serviceTags: readonly string[] = ['Photography', 'Videography', 'Editing', 'Drone', 'Album']
   static readonly leadSources: readonly string[] = ['Reference', 'Instagram', 'Facebook', 'Others']
   static readonly budgets: readonly string[] = ['Agreed', 'Negotiation', 'Low']
   static readonly expenseCategories: readonly string[] = ['Camera Rent', 'Lens Rent', 'Drone Rent', 'Travelling', 'Fuel', 'Hotel', 'Food', 'Team Payment', 'Editing', 'Printing', 'Album', 'Courier', 'Other Expenses']

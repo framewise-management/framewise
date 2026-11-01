@@ -13,6 +13,8 @@ const PATHS = {
   call: 'M5 3h4l2 5-3 2a16 16 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2',
   chat: 'M21 11a9 9 0 0 1-9 9H7l-4 2 1-5a9 9 0 1 1 17-6 M8 8l2 3 3 2 3-2',
   note: 'M4 4h10 M4 4v16h16V10 M12 15l8-8-3-3-8 8-1 4z',
+  package: 'M21 8 12 3 3 8l9 5 9-5z M3 8v8l9 5 9-5V8 M12 13v8',
+  services: 'M4 6h16 M4 12h16 M4 18h10',
 } as const
 
 export type IconName = keyof typeof PATHS | 'more'
