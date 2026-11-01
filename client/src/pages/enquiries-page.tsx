@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Booking } from '@framewise/shared/booking.ts'
+import { Pricing } from '@framewise/shared/pricing.ts'
 import { useStudio } from '../data/studio-context.tsx'
 import type { Client, Enquiry } from '../data/types.ts'
 import { EnquiryForm } from '../forms/enquiry-form.tsx'
@@ -52,7 +53,7 @@ function EnquiryCard({ enquiry: q }: { enquiry: Enquiry }) {
       <p>{Format.date(q.wedding_date)} · {q.city}<br />{q.phone}</p>
       <p>{q.notes}</p>
       <p className="subtext">{q.lead_source || 'Source not recorded'} · Budget {q.budget || 'not recorded'}</p>
-      <div className="line-items"><span>{q.package_name}</span><strong>{Format.money(q.price - q.discount)}</strong></div>
+      <div className="line-items"><span>{q.package_name}</span><strong>{Format.money(Pricing.finalQuote(q.price, q.discount))}</strong></div>
       <div className="field" style={{ marginTop: 16 }}>
         <label>Status</label>
         <select value={q.status} disabled={!!q.client_id} onChange={e => setStatus(e.target.value)}>{Booking.enquiryStatuses.map(s => <option key={s}>{s}</option>)}</select>

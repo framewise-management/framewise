@@ -60,9 +60,5 @@ export class EnquiryService {
 
 function check(row: Row, current: { price: number; discount: number }): void {
   if (!String(row.name || '').trim()) throw new HttpError(400, 'Enter the enquiry name')
-  try {
-    Pricing.finalQuote(Number(row.price ?? current.price), Number(row.discount ?? current.discount))
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message)
-  }
+  Pricing.finalQuote(Number(row.price ?? current.price), Number(row.discount ?? current.discount))
 }

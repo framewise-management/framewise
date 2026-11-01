@@ -47,7 +47,7 @@ export class ClientService {
     if (!name) throw new HttpError(400, 'Enter a client name')
     const price = Number(client.price || 0) || days.reduce((n, d) => n + Number(d.price || 0), 0)
     const discount = Number(client.discount || 0) || (!Number(client.price || 0) ? days.reduce((n, d) => n + Number(d.discount || 0), 0) : 0)
-    checkedQuote(price, discount)
+    Pricing.finalQuote(price, discount)
     const row = { ...client, id: crypto.randomUUID(), name, price, discount, finance_mode: (client.finance_mode || 'Shared') as ClientRow['finance_mode'] }
     const [[created]] = await this.#db.apply([
       { op: 'insert', table: 'clients', row },
@@ -62,7 +62,7 @@ export class ClientService {
     const linked = new Set<number>()
     for (const p of plans) {
       if (!p.name?.trim() || !p.day_indexes?.length) throw new HttpError(400, 'Give each package a name and linked event days')
-      const total = checkedQuote(Number(p.price || 0), Number(p.discount || 0))
+      const total = Pricing.finalQuote(Number(p.price || 0), Number(p.discount || 0))
       for (const i of p.day_indexes) {
         if (!Number.isInteger(i) || i < 0 || i >= days.length || linked.has(i)) throw new HttpError(400, 'Each event must belong to exactly one package')
         linked.add(i)
@@ -82,15 +82,15 @@ export class ClientService {
       package_name: plans.length === 1 ? plans[0].name!.trim() : 'Multiple packages',
     }
     const dayChanges = this.#events.dayChanges(row, false, days.map(d => ({ ...d, price: 0, discount: 0, booking_amount: 0 })))
-    const events = dayChanges.flatMap(c => (c.op === 'insert' && c.table === 'events' ? [{ ...c.row, package_id: null } as unknown as EventRow] : []))
+    const events = dayChanges.flatMap(c => (c.op === 'insert' && c.table === 'events' ? [{ id: String(c.row.id), client_id: row.id, package_id: null }] : []))
     const changes: Change[] = [{ op: 'insert', table: 'clients', row }, ...dayChanges]
-    const packages: PackageRow[] = []
+    const packages: Pick<PackageRow, 'id'>[] = []
     for (const plan of plans) {
       const planned = this.#packages.packageChanges(
         { clientId: row.id, events, packages, payments: [], items: [] },
         { name: plan.name, price: Number(plan.price || 0), discount: Number(plan.discount || 0), events: plan.day_indexes!.map(i => events[i].id), deliverables: plan.deliverables ?? [], complimentary: plan.complimentary ?? [] },
       )
-      packages.push({ id: planned.id, client_id: row.id } as PackageRow)
+      packages.push({ id: planned.id })
       changes.push(...planned.changes)
       if (Number(plan.booking_amount || 0) > 0)
         changes.push({ op: 'insert', table: 'payments', row: {
@@ -107,7 +107,7 @@ export class ClientService {
     const [packages, events] = await Promise.all([this.#db.select('packages', { client_id: id }), this.#db.select<EventRow>('events', { client_id: id })])
     if (packages.length && (['price', 'discount', 'finance_mode'] as const).some(k => k in patch && String(patch[k]) !== String(client[k])))
       throw new HttpError(400, 'Edit quotation in the package card')
-    if ('price' in patch || 'discount' in patch) checkedQuote(Number(patch.price ?? client.price), Number(patch.discount ?? client.discount))
+    if ('price' in patch || 'discount' in patch) Pricing.finalQuote(Number(patch.price ?? client.price), Number(patch.discount ?? client.discount))
     if ('name' in patch && !String(patch.name || '').trim()) throw new HttpError(400, 'Enter a client name')
 
     const changes: Change[] = [{ op: 'update', table: 'clients', match: { id }, set: patch }]
@@ -145,14 +145,6 @@ export class ClientService {
 
 function byOrder(a: ClientRow, b: ClientRow): number {
   return (a.sort_order ?? Infinity) - (b.sort_order ?? Infinity) || a.code.localeCompare(b.code)
-}
-
-function checkedQuote(price: number, discount: number): number {
-  try {
-    return Pricing.finalQuote(price, discount)
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message)
-  }
 }
 
 // the client's wedding date mirrors its single Wedding event; with several weddings each is edited on its event

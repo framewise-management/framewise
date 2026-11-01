@@ -1,5 +1,6 @@
 import type { Server } from 'node:http'
 import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express'
+import { PricingError } from '@framewise/shared/pricing-error.ts'
 import { ClientService, type PackagePlan } from '../clients/client-service.ts'
 import { DatabaseError } from '../db/database-error.ts'
 import { EnquiryService } from '../enquiries/enquiry-service.ts'
@@ -156,6 +157,8 @@ const USER_ERRORS: Readonly<Record<string, number>> = {
 const handleErrors: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message })
+  } else if (err instanceof PricingError) {
+    res.status(400).json({ error: err.message })
   } else if (err instanceof DatabaseError && USER_ERRORS[err.code]) {
     res.status(USER_ERRORS[err.code]).json({ error: err.message })
   } else if (err?.type === 'entity.parse.failed') {

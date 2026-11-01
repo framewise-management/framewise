@@ -33,13 +33,11 @@ export class InvoiceService {
       this.#db.select<PackageRow>('packages', { client_id: client.id }),
       this.#db.select<PaymentRow>('payments', { client_id: client.id }),
     ])
-    const clientQuote = Pricing.quote({ financeMode: client.finance_mode, amount: client.price - client.discount }, packages, events.map(e => ({ quotation: e.quotation ?? undefined })))
-    const quote = pkg
-      ? Number(pkg.price) - Number(pkg.discount)
-      : event && client.finance_mode === 'Per day' ? Number(event.quotation ?? 0) : clientQuote
-    const received = payments
-      .filter(item => pkg ? item.package_id === pkg.id : event && client.finance_mode === 'Per day' ? item.event_id === event.id : true)
-      .reduce((sum, item) => sum + Number(item.amount), 0)
+    const { quote, received } = Pricing.balance(
+      { financeMode: client.finance_mode, amount: client.price - client.discount }, packages, events,
+      payments.map(p => ({ amount: p.amount, packageId: p.package_id, eventId: p.event_id })),
+      { packageId: payment.package_id, eventId: payment.event_id },
+    )
     const business = { company: settings.company, currency: settings.currency, ...((settings.invoice_business as Row | undefined) ?? {}) }
     const snapshot = {
       documentKind: 'receipt', clientId: client.id, billTo: client.name, client: { ...client }, company: business,

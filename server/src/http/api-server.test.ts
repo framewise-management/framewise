@@ -64,6 +64,7 @@ test('clients round-trip over http and errors carry their message', async () => 
     assert.equal(created.status, 201)
     assert.equal(created.body.code, 'WC-0001')
     assert.deepEqual(await call('POST', '/api/clients', { client: { name: 'B', id: 'x' }, days: [day] }), { status: 400, body: { error: 'Unknown fields: id' } })
+    assert.deepEqual(await call('POST', '/api/clients', { client: { name: 'B', price: 100, discount: 200 }, days: [day] }), { status: 400, body: { error: 'Discount must be between zero and package price' } })
     assert.deepEqual(await call('POST', `/api/clients/${created.body.id}/events`, { days: [{ ...day, booking_amount: 5000 }] }), { status: 400, body: { error: 'Client payments exceed quotation' } })
     assert.equal((await call('PATCH', `/api/clients/${crypto.randomUUID()}`, { notes: 'x' })).status, 404)
     assert.equal((await call('PATCH', '/api/clients/not-a-uuid', { notes: 'x' })).status, 400)
