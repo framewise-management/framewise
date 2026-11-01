@@ -17,11 +17,11 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node22',
+  target: 'node24',
   // bundled CommonJS dependencies (express) still call require()
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
 })
-writeFileSync(`${fn}/.vc-config.json`, JSON.stringify({ runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', regions: ['bom1'], maxDuration: 30 }, null, 2))
+writeFileSync(`${fn}/.vc-config.json`, JSON.stringify({ runtime: 'nodejs24.x', handler: 'index.mjs', launcherType: 'Nodejs', regions: ['bom1'], maxDuration: 30 }, null, 2))
 
 mkdirSync(out, { recursive: true })
 writeFileSync(`${out}/config.json`, JSON.stringify({
