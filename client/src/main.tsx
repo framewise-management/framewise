@@ -2,9 +2,12 @@ import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Agentation } from 'agentation'
 import { ApiClient } from './api/api-client.ts'
+import { ApiError } from './api/api-error.ts'
 import { Session } from './api/session.ts'
 import { StudioProvider } from './data/studio-context.tsx'
+import { CreateStudioPage } from './pages/create-studio-page.tsx'
 import { LoginPage } from './pages/login-page.tsx'
+import { SignupPage } from './pages/signup-page.tsx'
 import { Shell } from './pages/shell.tsx'
 import { QuotePage } from './quotes/quote-page.tsx'
 import './style.css'
@@ -28,17 +31,26 @@ function App() {
   }, [])
   const quote = hash.match(/^#\/quote\/([a-f0-9-]{36})\/([a-f0-9]{64})$/i)
   if (quote) return <QuotePage key={hash} studioId={quote[1]} token={quote[2]} />
-  return <Workspace />
+  return <Workspace signup={hash === '#/signup'} />
 }
 
-function Workspace() {
+function Workspace({ signup }: { signup: boolean }) {
   const [email, setEmail] = useState<string | null | undefined>(undefined)
+  // false: signed in, but the login has no studio yet (403 from the API)
+  const [linked, setLinked] = useState<boolean | undefined>(undefined)
   useEffect(() => {
     const check = () => { session.email().then(setEmail) }
     check()
     return session.onChange(check)
   }, [])
+  useEffect(() => {
+    if (!email) return
+    setLinked(undefined)
+    api.get('/studio').then(() => setLinked(true), e => setLinked(!(e instanceof ApiError && e.status === 403)))
+  }, [email])
   if (email === undefined) return null
-  if (!email) return <LoginPage session={session} />
+  if (!email) return signup ? <SignupPage session={session} /> : <LoginPage session={session} />
+  if (linked === undefined) return null
+  if (!linked) return <CreateStudioPage api={api} email={email} onCreated={() => setLinked(true)} onSignOut={() => session.signOut()} />
   return <StudioProvider api={api}><Shell email={email} onSignOut={() => session.signOut()} /></StudioProvider>
 }

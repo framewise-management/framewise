@@ -16,6 +16,7 @@ import { TeamService } from './team/team-service.ts'
 import { TermsService } from './terms/terms-service.ts'
 import { PaymentSettings } from './settings/payment-settings.ts'
 import { StudioProfile } from './studios/studio-profile.ts'
+import { StudioOnboarding } from './studios/studio-onboarding.ts'
 import { QuoteService } from './quotes/quote-service.ts'
 
 // wiring shared by local start-up (main.ts), the Vercel function (vercel.ts) and the create-studio script
@@ -24,6 +25,7 @@ export class Studio {
     const supabase = Studio.supabase(env)
     return new ApiServer({
       auth: new SupabaseTokenVerifier(supabase),
+      onboarding: new StudioOnboarding(supabase),
       servicesFor: studioId => Studio.services(new SupabaseDatabase(supabase, studioId)),
     })
   }

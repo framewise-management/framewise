@@ -1,3 +1,4 @@
+import { ApiError } from './api-error.ts'
 import type { Session } from './session.ts'
 
 // calls the Express API with the signed-in user's token; server errors come back as { error } and are thrown with that message
@@ -37,7 +38,7 @@ export class ApiClient {
     })
     if (res.status === 204) return undefined as T
     const json = (await res.json().catch(() => ({ error: `Server error (${res.status})` }))) as { error?: string }
-    if (!res.ok) throw new Error(json.error || `Server error (${res.status})`)
+    if (!res.ok) throw new ApiError(res.status, json.error || `Server error (${res.status})`)
     return json as T
   }
 }

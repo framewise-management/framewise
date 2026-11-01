@@ -15,14 +15,16 @@ import { TeamService } from '../team/team-service.ts'
 import { TermsService } from '../terms/terms-service.ts'
 import { PaymentSettings } from '../settings/payment-settings.ts'
 import { StudioProfile } from '../studios/studio-profile.ts'
+import type { StudioOnboarding } from '../studios/studio-onboarding.ts'
 import { QuoteService } from '../quotes/quote-service.ts'
 import { Body } from './body.ts'
 import { HttpError } from './http-error.ts'
 import { InvoiceService } from '../invoices/invoice-service.ts'
-import type { TokenVerifier } from './supabase-token-verifier.ts'
+import type { SignedInUser, TokenVerifier } from './supabase-token-verifier.ts'
 
 export interface ApiServerDeps {
   auth: TokenVerifier
+  onboarding: Pick<StudioOnboarding, 'createForUser'>
   // the services of one studio, built per request for the signed-in user's studio
   servicesFor(studioId: string): StudioServices
 }
@@ -47,7 +49,7 @@ export interface StudioServices {
 export class ApiServer {
   readonly #app: Express
 
-  constructor({ auth, servicesFor }: ApiServerDeps) {
+  constructor({ auth, onboarding, servicesFor }: ApiServerDeps) {
     const app = express()
     app.use(express.json({ limit: '1mb' }))
     app.get('/health', (_req, res) => { res.json({ ok: true }) })
@@ -66,6 +68,14 @@ export class ApiServer {
       res.json(await servicesFor(req.params.studio).quotes.accept(req.params.token, req.body?.code, req.body?.consent))
     })
     app.use('/api/public/quotes', publicQuote)
+
+    // self sign-up: the one signed-in route that works before the login has a studio
+    app.post('/api/studios', async (req, res) => {
+      const user = await signedIn(auth, req.headers.authorization)
+      if (user.studioId) throw new HttpError(409, 'This login already has a studio')
+      const { company, client_code_prefix } = Body.pick(req.body, ['company', 'client_code_prefix'])
+      res.status(201).json(await onboarding.createForUser(user.userId, { company: company as string, clientCodePrefix: client_code_prefix as string | undefined }))
+    })
 
     const api = express.Router()
     api.use(requireStudio(auth, servicesFor))
@@ -170,13 +180,18 @@ export class ApiServer {
 
 function requireStudio(auth: TokenVerifier, servicesFor: ApiServerDeps['servicesFor']): RequestHandler {
   return async (req, res, next) => {
-    const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
-    const user = token ? await auth.verify(token) : null
-    if (!user) throw new HttpError(401, 'Sign in again')
+    const user = await signedIn(auth, req.headers.authorization)
     if (!user.studioId) throw new HttpError(403, 'This login is not linked to a studio')
     res.locals.services = servicesFor(user.studioId)
     next()
   }
+}
+
+async function signedIn(auth: TokenVerifier, header: string | undefined): Promise<SignedInUser> {
+  const token = header?.match(/^Bearer (.+)$/)?.[1]
+  const user = token ? await auth.verify(token) : null
+  if (!user) throw new HttpError(401, 'Sign in again')
+  return user
 }
 
 function services(res: Response): StudioServices {

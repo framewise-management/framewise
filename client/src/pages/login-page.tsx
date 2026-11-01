@@ -19,6 +19,7 @@ export function LoginPage({ session }: { session: Session }) {
           </div>
           <div className="modal-footer"><button type="submit" className="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button></div>
         </form>
+        <p className="subtext">New studio? <a href="#/signup" style={{ textDecoration: 'underline' }}>Create an account</a></p>
       </section>
     </main>
   )

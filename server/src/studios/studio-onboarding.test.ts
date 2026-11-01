@@ -32,7 +32,30 @@ test('bad input creates nothing', async () => {
   }
 })
 
-function fakeSupabase(failingTable?: string) {
+test('a signed-in login gets a studio and becomes its member', async () => {
+  const { client, log } = fakeSupabase()
+  assert.deepEqual(await new StudioOnboarding(client).createForUser('u9', { company: ' Acme ', clientCodePrefix: 'AC-' }), { id: 's1', company: 'Acme' })
+  assert.deepEqual(log, [
+    'insert studios {"company":"Acme","client_code_prefix":"AC-"}',
+    'insert studio_members {"user_id":"u9","studio_id":"s1"}',
+  ])
+})
+
+test('a login that already has a studio gets a 409 and no extra studio', async () => {
+  const { client, log } = fakeSupabase('studio_members', '23505')
+  await assert.rejects(new StudioOnboarding(client).createForUser('u9', { company: 'Acme' }), { status: 409, message: 'This login already has a studio' })
+  assert.deepEqual(log.slice(-1), ['delete studios s1'])
+})
+
+test('bad studio details are a 400 and create nothing', async () => {
+  for (const details of [{ company: '' }, { company: 'Acme', clientCodePrefix: 'BAD PREFIX' }, { company: 42 as unknown as string }]) {
+    const { client, log } = fakeSupabase()
+    await assert.rejects(new StudioOnboarding(client).createForUser('u9', details), { status: 400 })
+    assert.deepEqual(log, [])
+  }
+})
+
+function fakeSupabase(failingTable?: string, code?: string) {
   const log: string[] = []
   const client = {
     auth: {
@@ -44,7 +67,7 @@ function fakeSupabase(failingTable?: string) {
     from: (table: string) => ({
       insert: (row: unknown) => {
         log.push(`insert ${table} ${JSON.stringify(row)}`)
-        const result = table === failingTable ? { data: null, error: { message: 'boom' } } : { data: { id: 's1' }, error: null }
+        const result = table === failingTable ? { data: null, error: { message: 'boom', code } } : { data: { id: 's1' }, error: null }
         return Object.assign(Promise.resolve(result), { select: () => ({ single: async () => result }) })
       },
       delete: () => ({ eq: async (_column: string, value: string) => { log.push(`delete ${table} ${value}`); return { error: null } } }),

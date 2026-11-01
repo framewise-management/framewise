@@ -21,6 +21,13 @@ export class Session {
     if (error) throw new Error(error.message)
   }
 
+  // true when Supabase wants the email confirmed before the first sign-in
+  async signUp(email: string, password: string, confirmUrl: string): Promise<boolean> {
+    const { data, error } = await this.#auth.signUp({ email, password, options: { emailRedirectTo: confirmUrl } })
+    if (error) throw new Error(error.message)
+    return !data.session
+  }
+
   async signOut(): Promise<void> {
     await this.#auth.signOut()
   }
