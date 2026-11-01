@@ -14,6 +14,7 @@ import { TaskService } from '../tasks/task-service.ts'
 import { TeamService } from '../team/team-service.ts'
 import { TermsService } from '../terms/terms-service.ts'
 import { PaymentSettings } from '../settings/payment-settings.ts'
+import { StudioProfile } from '../studios/studio-profile.ts'
 import { Body } from './body.ts'
 import { HttpError } from './http-error.ts'
 import { InvoiceService } from '../invoices/invoice-service.ts'
@@ -38,6 +39,7 @@ export interface StudioServices {
   terms: TermsService
   paymentSettings: PaymentSettings
   invoices: InvoiceService
+  profile: StudioProfile
 }
 
 export class ApiServer {
@@ -50,6 +52,8 @@ export class ApiServer {
 
     const api = express.Router()
     api.use(requireStudio(auth, servicesFor))
+
+    api.get('/studio', async (_req, res) => { res.json(await services(res).profile.get()) })
 
     api.get('/payment-settings', async (_req, res) => { res.json(await services(res).paymentSettings.get()) })
     api.put('/payment-settings', async (req, res) => { res.json(await services(res).paymentSettings.update(Body.pick(req.body, ['payment_conditions', 'payment_modes', 'upi_id', 'bank_details', 'gst_number', 'payment_notes', 'invoice_prefix', 'invoice_padding']))) })

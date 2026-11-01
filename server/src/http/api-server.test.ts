@@ -46,6 +46,7 @@ test('each login only sees and changes its own studio', async () => {
     assert.deepEqual((await call('GET', '/api/clients', undefined, 'other')).body.map((c: { name: string }) => c.name), ['Ravi'])
     assert.equal((await call('PATCH', `/api/clients/${mine.id}`, { notes: 'x' }, 'other')).status, 404)
     assert.equal((await call('GET', '/api/payment-settings', undefined, 'other')).status, 200)
+    assert.deepEqual([(await call('GET', '/api/studio')).body, (await call('GET', '/api/studio', undefined, 'other')).body], [{ company: 'Framewise' }, { company: 'Other' }])
     assert.deepEqual((await call('GET', '/api/clients')).body.map((c: { name: string }) => c.name), ['Asha'])
   } finally {
     server.close()

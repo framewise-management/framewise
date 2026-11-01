@@ -118,6 +118,7 @@ export interface TeamMember {
 }
 
 export interface Lists {
+  studio: { company: string }
   clients: Client[]
   events: StudioEvent[]
   packages: Package[]

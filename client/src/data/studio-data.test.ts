@@ -6,7 +6,7 @@ import type { Client, Lists, Package, Payment, StudioEvent } from './types.ts'
 const client = (over: Partial<Client>): Client => ({ id: 'c1', code: 'WC-0001', name: 'A', price: 0, discount: 0, finance_mode: 'Shared', status: 'Booked', ...over } as Client)
 const event = (over: Partial<StudioEvent>): StudioEvent => ({ id: 'e1', client_id: 'c1', type: 'Wedding', event_date: '2026-12-10', start_time: '09:00:00', status: 'Scheduled', booking_status: null, quotation: 0, team: [], ...over } as StudioEvent)
 const pay = (over: Partial<Payment>): Payment => ({ id: crypto.randomUUID(), client_id: 'c1', event_id: null, package_id: null, amount: 0, stage: 'Booking Amount', ...over } as Payment)
-const lists = (over: Partial<Lists>): Lists => ({ clients: [], events: [], packages: [], payments: [], enquiries: [], stagePlans: [], team: [], ...over })
+const lists = (over: Partial<Lists>): Lists => ({ studio: { company: 'Studio' }, clients: [], events: [], packages: [], payments: [], enquiries: [], stagePlans: [], team: [], ...over })
 
 test('balances follow the client pricing model', () => {
   const shared = StudioData.of(lists({ clients: [client({ price: 100000, discount: 10000 })], payments: [pay({ amount: 30000 })] }))

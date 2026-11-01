@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { ClientService } from './clients/client-service.ts'
 import type { Database } from './db/database.ts'
 import { SupabaseDatabase } from './db/supabase-database.ts'
@@ -15,19 +15,24 @@ import { TaskService } from './tasks/task-service.ts'
 import { TeamService } from './team/team-service.ts'
 import { TermsService } from './terms/terms-service.ts'
 import { PaymentSettings } from './settings/payment-settings.ts'
+import { StudioProfile } from './studios/studio-profile.ts'
 
-// wiring shared by local start-up (main.ts) and the Vercel function (vercel.ts)
+// wiring shared by local start-up (main.ts), the Vercel function (vercel.ts) and the create-studio script
 export class Studio {
   static fromEnv(env: NodeJS.ProcessEnv): ApiServer {
-    const url = env.SUPABASE_URL
-    const key = env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !key) throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-    // the server-side client must not try to keep a browser session
-    const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
+    const supabase = Studio.supabase(env)
     return new ApiServer({
       auth: new SupabaseTokenVerifier(supabase),
       servicesFor: studioId => Studio.services(new SupabaseDatabase(supabase, studioId)),
     })
+  }
+
+  // the service-role client; a server-side client must not try to keep a browser session
+  static supabase(env: NodeJS.ProcessEnv): SupabaseClient {
+    const url = env.SUPABASE_URL
+    const key = env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+    return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
   }
 
   // every service for one studio, all sharing its scoped database; cheap enough to build per request
@@ -47,6 +52,7 @@ export class Studio {
       terms: new TermsService(db),
       paymentSettings: new PaymentSettings(db),
       invoices: new InvoiceService(db),
+      profile: new StudioProfile(db),
     }
   }
 }

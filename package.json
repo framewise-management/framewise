@@ -13,7 +13,8 @@
     "test:legacy": "node --test legacy/clean-start.test.mjs",
     "build:vercel": "node scripts/build-vercel.mjs",
     "vercel-build": "pnpm build:vercel",
-    "deploy:vercel": "node scripts/deploy.mjs"
+    "deploy:vercel": "node scripts/deploy.mjs",
+    "studio:create": "pnpm --filter @framewise/server studio:create"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

@@ -36,7 +36,7 @@ export function Shell({ email, onSignOut }: { email: string; onSignOut: () => vo
   return (
     <div className="shell">
       <aside className="sidebar">
-        <a className="brand" href="#/dashboard"><span className="brand-mark" aria-hidden="true">F</span><span><strong>Framewise</strong><small>STUDIO WORKSPACE</small></span></a>
+        <a className="brand" href="#/dashboard"><span className="brand-mark" aria-hidden="true">F</span><span><strong>{studio.data.company}</strong><small>STUDIO WORKSPACE</small></span></a>
         <nav aria-label="Desktop navigation">
           {NAV.map(([r, label, icon]) => <a key={r} href={'#/' + r} className={r === route || (r === 'setup' && ['team', 'terms', 'payment-settings'].includes(route)) ? 'active' : ''} aria-current={r === route ? 'page' : undefined}><Icon name={icon} />{label}</a>)}
         </nav>
@@ -44,7 +44,7 @@ export function Shell({ email, onSignOut }: { email: string; onSignOut: () => vo
       </aside>
       <main className="main">
         <header className="topbar">
-          <a className="mobile-brand" href="#/dashboard"><strong>Framewise</strong></a>
+          <a className="mobile-brand" href="#/dashboard"><strong>{studio.data.company}</strong></a>
           <span className="crumb">{title}</span>
           <div className="topbar-actions">
             <span className="subtext desktop-date">{Format.date(studio.today)}</span>

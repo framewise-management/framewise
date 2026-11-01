@@ -6,6 +6,7 @@ import type { Client, Lists, Package, Payment, StudioEvent } from './types.ts'
 
 // everything the pages show, loaded once and re-loaded after each change; money comes from the same shared rules the server uses
 export class StudioData {
+  readonly company: string
   readonly clients: Client[]
   readonly events: StudioEvent[]
   readonly packages: Package[]
@@ -15,6 +16,7 @@ export class StudioData {
   readonly team: Lists['team']
 
   private constructor(lists: Lists) {
+    this.company = lists.studio.company
     this.clients = lists.clients
     this.events = [...lists.events].sort(StudioData.byDate)
     this.packages = lists.packages
@@ -29,12 +31,13 @@ export class StudioData {
   }
 
   static async load(api: ApiClient): Promise<StudioData> {
-    const [clients, events, packages, payments, enquiries, stagePlans, team] = await Promise.all([
+    const [studio, clients, events, packages, payments, enquiries, stagePlans, team] = await Promise.all([
+      api.get<Lists['studio']>('/studio'),
       api.get<Lists['clients']>('/clients'), api.get<Lists['events']>('/events'), api.get<Lists['packages']>('/packages'),
       api.get<Lists['payments']>('/payments'), api.get<Lists['enquiries']>('/enquiries'), api.get<Lists['stagePlans']>('/stage-plans'),
       api.get<Lists['team']>('/team'),
     ])
-    return new StudioData({ clients, events, packages, payments, enquiries, stagePlans, team })
+    return new StudioData({ studio, clients, events, packages, payments, enquiries, stagePlans, team })
   }
 
   static byDate(a: StudioEvent, b: StudioEvent): number {
