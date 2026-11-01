@@ -64,7 +64,7 @@ export class StudioData {
   quote(clientId: string): number {
     const c = this.client(clientId)
     if (!c) return 0
-    return Pricing.quote({ financeMode: c.finance_mode, amount: c.price - c.discount }, this.packagesOf(clientId), this.eventsOf(clientId).map(e => ({ quotation: e.quotation ?? undefined })))
+    return Pricing.quote({ financeMode: c.finance_mode, amount: c.price - c.discount }, this.packagesOf(clientId), this.eventsOf(clientId))
   }
 
   paid(clientId: string): number {
@@ -80,7 +80,7 @@ export class StudioData {
   }
 
   packageBalance(p: Package): number {
-    return p.price - p.discount - this.packagePaid(p.id)
+    return Pricing.finalQuote(p.price, p.discount) - this.packagePaid(p.id)
   }
 
   eventPaid(eventId: string): number {

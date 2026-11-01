@@ -8,13 +8,13 @@ export class PaymentSettings {
   constructor(db: Database) { this.#db = db }
 
   async get(): Promise<Row> {
-    const [settings] = await this.#db.select<SettingsRow>('settings')
+    const [settings] = await this.#db.select<SettingsRow>('studios')
     const business = settings.invoice_business ?? {}
     return { payment_conditions: business.payment_conditions ?? [], payment_modes: business.payment_modes ?? [], upi_id: business.upi_id ?? '', bank_details: business.bank_details ?? '', gst_number: business.gst_number ?? '', payment_notes: business.payment_notes ?? '', invoice_prefix: settings.invoice_prefix, invoice_padding: settings.invoice_padding, next_invoice: settings.next_invoice }
   }
 
   async update(input: Row): Promise<Row> {
-    const [settings] = await this.#db.select<SettingsRow>('settings')
+    const [settings] = await this.#db.select<SettingsRow>('studios')
     const conditions = input.payment_conditions
     const modes = input.payment_modes
     const allowed = ['UPI', 'Bank transfer', 'Cash', 'Cheque', 'Card']
@@ -27,7 +27,7 @@ export class PaymentSettings {
     const fields = ['upi_id', 'bank_details', 'gst_number', 'payment_notes'] as const
     if (fields.some(k => typeof input[k] !== 'string')) throw new HttpError(400, 'Enter valid payment details')
     const invoiceBusiness = { ...settings.invoice_business, payment_conditions: conditions.map(c => ({ label: c.label.trim(), percent: c.percent })), payment_modes: modes, ...Object.fromEntries(fields.map(k => [k, (input[k] as string).trim()])) }
-    await this.#db.apply([{ op: 'update', table: 'settings', match: { id: true }, set: { invoice_business: invoiceBusiness, invoice_prefix: prefix, invoice_padding: padding } }])
+    await this.#db.apply([{ op: 'update', table: 'studios', match: {}, set: { invoice_business: invoiceBusiness, invoice_prefix: prefix, invoice_padding: padding } }])
     return this.get()
   }
 }

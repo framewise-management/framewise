@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { ClientService } from './clients/client-service.ts'
+import type { Database } from './db/database.ts'
 import { SupabaseDatabase } from './db/supabase-database.ts'
 import { EnquiryService } from './enquiries/enquiry-service.ts'
 import { EventService } from './events/event-service.ts'
 import { ExpenseService } from './expenses/expense-service.ts'
-import { ApiServer } from './http/api-server.ts'
+import { ApiServer, type StudioServices } from './http/api-server.ts'
 import { InvoiceService } from './invoices/invoice-service.ts'
 import { SupabaseTokenVerifier } from './http/supabase-token-verifier.ts'
 import { PackageService } from './packages/package-service.ts'
@@ -23,11 +24,17 @@ export class Studio {
     if (!url || !key) throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
     // the server-side client must not try to keep a browser session
     const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
-    const db = new SupabaseDatabase(supabase)
-    const events = new EventService(db)
-    const packages = new PackageService(db)
     return new ApiServer({
       auth: new SupabaseTokenVerifier(supabase),
+      servicesFor: studioId => Studio.services(new SupabaseDatabase(supabase, studioId)),
+    })
+  }
+
+  // every service for one studio, all sharing its scoped database; cheap enough to build per request
+  static services(db: Database, today?: () => string): StudioServices {
+    const events = new EventService(db, today)
+    const packages = new PackageService(db)
+    return {
       clients: new ClientService(db, events, packages),
       events,
       enquiries: new EnquiryService(db),
@@ -40,6 +47,6 @@ export class Studio {
       terms: new TermsService(db),
       paymentSettings: new PaymentSettings(db),
       invoices: new InvoiceService(db),
-    })
+    }
   }
 }

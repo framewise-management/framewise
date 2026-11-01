@@ -3,12 +3,14 @@ import { PGlite } from '@electric-sql/pglite'
 import type { Change, Database, Row } from './database.ts'
 import { DatabaseError } from './database-error.ts'
 
-// in-process Postgres with the real migrations, for tests
+// in-process Postgres with the real migrations, for tests; scoped to the migrated first studio unless forStudio picks another
 export class PgliteDatabase implements Database {
   readonly #pg: PGlite
+  readonly #studioId: string
 
-  private constructor(pg: PGlite) {
+  private constructor(pg: PGlite, studioId: string) {
     this.#pg = pg
+    this.#studioId = studioId
   }
 
   static async create(): Promise<PgliteDatabase> {
@@ -17,22 +19,32 @@ export class PgliteDatabase implements Database {
     await pg.exec('create role anon; create role authenticated; create role service_role;')
     for (const file of (await readdir(MIGRATIONS)).filter(f => f.endsWith('.sql')).sort())
       await pg.exec(await readFile(new URL(file, MIGRATIONS), 'utf8'))
-    return new PgliteDatabase(pg)
+    const { rows } = await pg.query<{ id: string }>('select id from studios')
+    return new PgliteDatabase(pg, rows[0].id)
   }
 
   get pg(): PGlite {
     return this.#pg
   }
 
+  get studioId(): string {
+    return this.#studioId
+  }
+
+  // the same database as seen by another studio
+  forStudio(studioId: string): PgliteDatabase {
+    return new PgliteDatabase(this.#pg, studioId)
+  }
+
   async select<T extends object = Row>(table: string, match: Row = {}): Promise<T[]> {
-    const keys = Object.keys(match).map(quote).join(', ')
-    const where = keys ? `where (${keys}) = (select ${keys} from jsonb_populate_record(null::${quote(table)}, $1))` : ''
-    const sql = `select coalesce(jsonb_agg(to_jsonb(t)), '[]') as rows from ${quote(table)} t ${where}`
-    return (await this.#run<{ rows: T[] }>(sql, keys ? [JSON.stringify(match)] : []))[0].rows
+    const scoped = { ...match, ...(table === 'studios' ? { id: this.#studioId } : { studio_id: this.#studioId }) }
+    const keys = Object.keys(scoped).map(quote).join(', ')
+    const sql = `select coalesce(jsonb_agg(to_jsonb(t)), '[]') as rows from ${quote(table)} t where (${keys}) = (select ${keys} from jsonb_populate_record(null::${quote(table)}, $1))`
+    return (await this.#run<{ rows: T[] }>(sql, [JSON.stringify(scoped)]))[0].rows
   }
 
   async apply(changes: readonly Change[]): Promise<Row[][]> {
-    return (await this.#run<{ result: Row[][] }>('select apply_changes($1) as result', [JSON.stringify(changes)]))[0].result
+    return (await this.#run<{ result: Row[][] }>('select apply_changes($1, $2) as result', [this.#studioId, JSON.stringify(changes)]))[0].result
   }
 
   async #run<T>(sql: string, params: unknown[]): Promise<T[]> {

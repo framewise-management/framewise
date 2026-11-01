@@ -22,9 +22,9 @@ export interface PackageInput {
 export interface PackageContext {
   clientId: string
   row?: PackageRow
-  events: readonly EventRow[]
-  packages: readonly PackageRow[]
-  payments: readonly PaymentRow[]
+  events: readonly Pick<EventRow, 'id' | 'client_id' | 'package_id'>[]
+  packages: readonly Pick<PackageRow, 'id'>[]
+  payments: readonly Pick<PaymentRow, 'id' | 'package_id' | 'event_id' | 'amount'>[]
   items: readonly DeliveryItemRow[]
 }
 
@@ -74,7 +74,7 @@ export class PackageService {
     if (ctx.events.some(e => e.package_id && e.package_id !== id && eventIds.includes(e.id))) throw new HttpError(400, 'An event already belongs to another package')
     const price = Number(input.price ?? row?.price ?? 0)
     const discount = Number(input.discount ?? row?.discount ?? 0)
-    const total = checkedQuote(price, discount)
+    const total = Pricing.finalQuote(price, discount)
     if (row && total < ctx.payments.filter(p => p.package_id === id).reduce((n, p) => n + p.amount, 0)) throw new HttpError(400, 'Package quotation cannot be below its receipts')
     const name = String(input.name ?? row?.name ?? '').trim()
     if (!name) throw new HttpError(400, 'Enter a package name')
@@ -159,14 +159,6 @@ function view(p: PackageRow, events: readonly EventRow[], items: readonly Delive
     ...p,
     events: events.filter(e => e.package_id === p.id).map(e => e.id),
     items: items.filter(i => i.package_id === p.id && !i.retired_at).sort((a, b) => a.position - b.position),
-  }
-}
-
-function checkedQuote(price: number, discount: number): number {
-  try {
-    return Pricing.finalQuote(price, discount)
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message)
   }
 }
 

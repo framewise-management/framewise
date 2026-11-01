@@ -18,7 +18,7 @@ async function setup() {
 test('creating a client writes the client, its days and booking payments together', async () => {
   const { db, clients } = await setup()
   const c = await clients.create({ name: ' Asha & Rohan ', status: 'Booked' }, [day({ price: 80000, discount: 5000, booking_amount: 10000 }), day({ type: 'Haldi', date_not_fixed: true, date: undefined, price: 20000 })])
-  assert.equal(c.code, 'WC-0001')
+  assert.equal(c.code, 'FW-0001')
   assert.deepEqual([c.name, c.price, c.discount], ['Asha & Rohan', 100000, 5000])
   const events = await db.select<EventRow & { services: string[]; start_time: string }>('events')
   assert.deepEqual(events.map(e => [e.type, e.event_date, e.quotation, e.services]), [['Wedding', '2026-12-10', 75000, ['Candid', 'Cinematic']], ['Haldi', null, 20000, ['Candid', 'Cinematic']]])

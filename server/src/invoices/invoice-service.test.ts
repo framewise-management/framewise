@@ -28,7 +28,7 @@ test('receipt issuance is idempotent and preserves payment, booking, and studio 
   const events = new EventService(db, () => '2026-10-24')
   const packages = new PackageService(db)
   const client = await new ClientService(db, events, packages).create({ name: 'Asha', price: 50000 }, [{ type: 'Wedding', date: '2026-12-10', venue: 'Pune', services: ['Candid'] }])
-  await db.apply([{ op: 'update', table: 'settings', match: { id: true }, set: { company: 'Studio One', invoice_business: { gst_number: 'GST-1' } } }])
+  await db.apply([{ op: 'update', table: 'studios', match: {}, set: { company: 'Studio One', invoice_business: { gst_number: 'GST-1' } } }])
   const payment = await new PaymentService(db).create({ client_id: client.id, amount: 10000, paid_on: '2026-10-24', stage: 'Booking', method: 'UPI' })
   const invoices = new InvoiceService(db)
   const first = await invoices.issueReceipt(payment.id as string)

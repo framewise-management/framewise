@@ -1,14 +1,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { PGlite } from '@electric-sql/pglite'
+import { readdir, readFile } from 'node:fs/promises'
+import { PGlite } from '@electric-sql/pglite'
+import { Booking } from '@framewise/shared/booking.ts'
+import { DeliveryItems } from '@framewise/shared/delivery-items.ts'
 import { Pricing, type PricedPackage, type QuotedClient, type QuotedEvent } from '@framewise/shared/pricing.ts'
+import { StudioLists } from '@framewise/shared/studio-lists.ts'
 import { PgliteDatabase } from './pglite-database.ts'
 
-test('migrations apply and seed one settings row', async () => {
+test('migrations apply and create the first studio', async () => {
   const db = await freshDb()
-  assert.deepEqual((await db.query('select company, next_invoice from settings')).rows, [{ company: 'Framewise', next_invoice: 1 }])
-  assert.equal(await clientCode(db, await addClient(db)), 'WC-0001')
-  assert.equal(await clientCode(db, await addClient(db)), 'WC-0002')
+  assert.deepEqual((await db.query('select company, next_invoice, client_code_prefix from studios')).rows, [{ company: 'Framewise', next_invoice: 1, client_code_prefix: 'FW-' }])
+  assert.equal(await clientCode(db, await addClient(db)), 'FW-0001')
+  assert.equal(await clientCode(db, await addClient(db)), 'FW-0002')
 })
 
 test('row checks reject bad values', async () => {
@@ -58,7 +62,7 @@ test('links must stay within one client and one package', async () => {
   await rejects(db, `insert into payments (client_id, event_id, package_id, amount, paid_on) values ($1, $2, $3, 10, '2026-10-24')`, 'not part of its package', [a, looseEvent, pkgOfA])
 })
 
-test('invoice numbers follow the settings, skip taken numbers and never repeat', async () => {
+test('invoice numbers follow the studio settings, skip taken numbers and never repeat', async () => {
   const db = await freshDb()
   const client = await addClient(db, 100000)
   const payment = await pay(db, client, 1000)
@@ -66,10 +70,10 @@ test('invoice numbers follow the settings, skip taken numbers and never repeat',
     db.query<{ number: string; sequence: number }>(`insert into invoices (client_id, document_kind, payment_id, client_invoice, snapshot${extra ? ', number' : ''}) values ($1, $2, $3, $4, '{}'${extra ? `, '${extra}'` : ''}) returning number, sequence`, [client, kind, kind === 'invoice' ? null : payment, kind === 'invoice'])
   assert.deepEqual((await issue('invoice')).rows[0], { number: '000001', sequence: 1 })
   await issue('invoice', '000002')
-  await db.query(`update settings set invoice_prefix = 'WC-', invoice_padding = 4`)
+  await db.query(`update studios set invoice_prefix = 'WC-', invoice_padding = 4`)
   assert.equal((await issue('receipt')).rows[0].number, 'WC-0002')
   await rejects(db, `insert into invoices (client_id, document_kind, payment_id, snapshot) values ($1, 'receipt', $2, '{}')`, 'unique', [client, payment])
-  assert.equal((await db.query<{ next_invoice: number }>('select next_invoice from settings')).rows[0].next_invoice, 3)
+  assert.equal((await db.query<{ next_invoice: number }>('select next_invoice from studios')).rows[0].next_invoice, 3)
 })
 
 test('editing or deleting a payment leaves an audit row', async () => {
@@ -89,7 +93,7 @@ test('apply_changes commits all changes or none', async () => {
     { op: 'insert', table: 'clients', row: { id, name: 'Asha', price: 100000 } },
     { op: 'insert', table: 'events', row: { client_id: id, type: 'Wedding', services: ['Candid'], start_time: '09:00', end_time: '18:00' } },
   ])
-  assert.equal(client.code, 'WC-0001')
+  assert.equal(client.code, 'FW-0001')
   assert.equal(client.price, 100000)
   assert.deepEqual(events[0].services, ['Candid'])
   await db.apply([{ op: 'update', table: 'clients', match: { id }, set: { status: 'Booked' } }])
@@ -129,8 +133,105 @@ test('client_quote in SQL matches Pricing.quote in shared/', async () => {
   }
 })
 
+test('SQL check lists match the lists in shared/', async () => {
+  const db = await freshDb()
+  const pairs: [string, string, readonly string[]][] = [
+    ['clients', 'status', Booking.clientStatuses],
+    ['enquiries', 'status', Booking.enquiryStatuses],
+    ['events', 'booking_status', Booking.clientStatuses],
+    ['delivery_items', 'status', DeliveryItems.statuses],
+    ['payments', 'method', StudioLists.paymentMethods],
+  ]
+  for (const [table, column, list] of pairs)
+    assert.deepEqual(await checkList(db, table, column), [...list].sort(), `${table}.${column}`)
+})
+
+async function checkList(db: PGlite, table: string, column: string): Promise<string[]> {
+  const { rows } = await db.query<{ def: string }>(`select pg_get_constraintdef(oid) as def from pg_constraint where conrelid = $1::regclass and contype = 'c'`, [table])
+  const defs = rows.map(r => r.def).filter(d => d.includes(`(${column} = ANY`))
+  assert.equal(defs.length, 1, `one list check on ${table}.${column}`)
+  return [...defs[0].matchAll(/'([^']*)'::text/g)].map(m => m[1]).sort()
+}
+
+test('each studio numbers its own clients and invoices', async () => {
+  const db = await freshDb()
+  const second = await one(db, `insert into studios (company, client_code_prefix, invoice_prefix) values ('Second', 'SB-', 'INV') returning id`)
+  const a = await addClient(db, 1000)
+  const b = await one(db, `insert into clients (studio_id, name, price) values ($1, 'B', 1000) returning id`, [second])
+  assert.deepEqual([await clientCode(db, a), await clientCode(db, b)], ['FW-0001', 'SB-0001'])
+  const paidA = await pay(db, a, 10)
+  const paidB = await one(db, `insert into payments (studio_id, client_id, amount, paid_on) values ($1, $2, 10, '2026-10-24') returning id`, [second, b])
+  const numberA = (await db.query<{ number: string }>(`insert into invoices (client_id, document_kind, payment_id, snapshot) values ($1, 'receipt', $2, '{}') returning number`, [a, paidA])).rows[0].number
+  const numberB = (await db.query<{ number: string }>(`insert into invoices (studio_id, client_id, document_kind, payment_id, snapshot) values ($1, $2, 'receipt', $3, '{}') returning number`, [second, b, paidB])).rows[0].number
+  assert.deepEqual([numberA, numberB], ['000001', 'INV000001'])
+})
+
+test('links cannot point into another studio', async () => {
+  const db = await freshDb()
+  const second = await one(db, `insert into studios (company) values ('Second') returning id`)
+  const client = await addClient(db, 1000)
+  const member = await one(db, `insert into team_members (name) values ('Asha') returning id`)
+  await rejects(db, `insert into events (studio_id, client_id, type, time_not_recorded) values ($1, $2, 'Wedding', true)`, 'foreign key', [second, client])
+  await rejects(db, `insert into expenses (studio_id, title, amount, spent_on, client_id) values ($1, 'Fuel', 10, '2026-10-24', $2)`, 'foreign key', [second, client])
+  await rejects(db, `insert into tasks (studio_id, title, due, owner_id) values ($1, 'Call', '2026-10-24', $2)`, 'foreign key', [second, member])
+})
+
+test('apply_changes stamps every write with its studio and never reaches another studio', async () => {
+  const first = await PgliteDatabase.create()
+  const secondId = (await first.pg.query<{ id: string }>(`insert into studios (company) values ('Second') returning id`)).rows[0].id
+  const second = first.forStudio(secondId)
+  const [[client]] = await second.apply([{ op: 'insert', table: 'clients', row: { name: 'B', studio_id: first.studioId } }])
+  assert.deepEqual([client.studio_id, client.code], [secondId, '0001'])
+  assert.deepEqual(await first.select('clients'), [])
+  await assert.rejects(first.apply([{ op: 'update', table: 'clients', match: { id: client.id }, set: { name: 'X' } }]), /Record not found/)
+  await assert.rejects(first.apply([{ op: 'delete', table: 'clients', match: { id: client.id } }]), /Record not found/)
+  await assert.rejects(second.apply([{ op: 'update', table: 'clients', match: { id: client.id }, set: { studio_id: first.studioId } }]), /cannot move between studios/)
+  await second.apply([{ op: 'update', table: 'studios', match: { id: first.studioId }, set: { company: 'Second Studio' } }])
+  assert.deepEqual([(await first.select<{ company: string }>('studios'))[0].company, (await second.select<{ company: string }>('studios'))[0].company], ['Framewise', 'Second Studio'])
+  await assert.rejects(second.apply([{ op: 'insert', table: 'studios', row: { company: 'X' } }]), /cannot be created or deleted/)
+  await assert.rejects(first.forStudio(crypto.randomUUID()).apply([{ op: 'insert', table: 'terms', row: { title: 'T', body: 'B' } }]), /Unknown studio/)
+})
+
+test('the studios migration moves the existing studio, its numbering and its WC- codes', async () => {
+  const pg = new PGlite()
+  await pg.exec('create role anon; create role authenticated; create role service_role;')
+  const files = (await readdir(MIGRATIONS)).filter(f => f.endsWith('.sql')).sort()
+  const at = files.indexOf('20261102000000_studios.sql')
+  for (const file of files.slice(0, at)) await pg.exec(await readFile(new URL(file, MIGRATIONS), 'utf8'))
+
+  await pg.exec(`update settings set company = 'Studio One', invoice_prefix = 'R-', invoice_padding = 4`)
+  const clients = [await one(pg, `insert into clients (name, price) values ('A', 1000) returning id`), await one(pg, `insert into clients (name) values ('B') returning id`), await one(pg, `insert into clients (name) values ('C') returning id`)]
+  const payment = await one(pg, `insert into payments (client_id, amount, paid_on) values ($1, 100, '2026-10-24') returning id`, [clients[0]])
+  await pg.query(`insert into invoices (client_id, document_kind, payment_id, snapshot) values ($1, 'receipt', $2, '{"client": {"code": "WC-0001"}}')`, [clients[0], payment])
+  const before = (await pg.query<{ updated_at: string }>('select updated_at from clients order by created_at')).rows
+
+  await pg.exec(await readFile(new URL(files[at], MIGRATIONS), 'utf8'))
+
+  const studio = (await pg.query<Record<string, unknown>>('select id, company, invoice_prefix, invoice_padding, next_invoice, client_code_prefix, next_client_code from studios')).rows
+  assert.equal(studio.length, 1)
+  assert.deepEqual({ ...studio[0], id: undefined }, { id: undefined, company: 'Studio One', invoice_prefix: 'R-', invoice_padding: 4, next_invoice: 2, client_code_prefix: 'FW-', next_client_code: 4 })
+  const id = studio[0].id
+  assert.deepEqual((await pg.query<{ code: string }>('select code from clients order by code')).rows.map(r => r.code), ['FW-0001', 'FW-0002', 'FW-0003'])
+  for (const table of ['clients', 'payments', 'invoices'])
+    assert.deepEqual((await pg.query<{ studio_id: string }>(`select distinct studio_id from ${table}`)).rows, [{ studio_id: id }], table)
+  assert.deepEqual((await pg.query('select updated_at from clients order by created_at')).rows, before)
+  assert.deepEqual((await pg.query('select * from payment_audit')).rows, [])
+  assert.equal((await pg.query<{ code: string }>(`select snapshot->'client'->>'code' as code from invoices`)).rows[0].code, 'WC-0001')
+  assert.equal((await pg.query<{ t: string | null }>(`select to_regclass('settings')::text as t`)).rows[0].t, null)
+
+  assert.equal(await one(pg, `insert into clients (studio_id, name) values ($1, 'D') returning code as id`, [id]), 'FW-0004')
+  const next = await one(pg, `insert into payments (studio_id, client_id, amount, paid_on) values ($1, $2, 100, '2026-10-24') returning id`, [id, clients[0]])
+  assert.equal(await one(pg, `insert into invoices (studio_id, client_id, document_kind, payment_id, snapshot) values ($1, $2, 'receipt', $3, '{}') returning number as id`, [id, clients[0], next]), 'R-0002')
+})
+
+const MIGRATIONS = new URL('../../../supabase/migrations/', import.meta.url)
+
+// raw inserts in these tests belong to the first studio unless they name another
 async function freshDb(): Promise<PGlite> {
-  return (await PgliteDatabase.create()).pg
+  const db = await PgliteDatabase.create()
+  const { rows } = await db.pg.query<{ table_name: string }>(`select table_name from information_schema.columns where table_schema = 'public' and column_name = 'studio_id'`)
+  for (const { table_name } of rows) await db.pg.exec(`alter table ${table_name} alter column studio_id set default '${db.studioId}'`)
+  return db.pg
 }
 
 async function one(db: PGlite, sql: string, params: unknown[] = []): Promise<string> {

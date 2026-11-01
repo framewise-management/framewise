@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Booking } from '@framewise/shared/booking.ts'
+import { Pricing } from '@framewise/shared/pricing.ts'
 import { StudioLists } from '@framewise/shared/studio-lists.ts'
 import { useStudio } from '../data/studio-context.tsx'
 import type { Client, Payment } from '../data/types.ts'
@@ -242,7 +243,7 @@ function PricingGroups({ client: c }: { client: Client }) {
             <p className="subtext">{p.events.map(id => data.event(id)).filter(e => e).map(e => <span key={e!.id}>{e!.type} · {Format.date(e!.event_date)}<br /></span>)}</p>
             <div className="line-items"><span>Original rate</span><strong>{Format.money(p.price)}</strong></div>
             <div className="line-items"><span>Discount</span><strong>{Format.money(p.discount)}</strong></div>
-            <div className="line-items"><span>Final package</span><strong>{Format.money(p.price - p.discount)}</strong></div>
+            <div className="line-items"><span>Final package</span><strong>{Format.money(Pricing.finalQuote(p.price, p.discount))}</strong></div>
             <div className="line-items"><span>Received / Balance</span><strong>{Format.money(paid)} / {Format.money(balance)}</strong></div>
             <Tag value={balance === 0 ? 'Paid' : paid ? 'Partially Paid' : 'Unpaid'} />
             {p.items.length > 0 && <p className="subtext">{p.items.filter(i => i.kind === 'deliverable').map(i => i.label).join(' · ')}</p>}

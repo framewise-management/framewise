@@ -79,7 +79,7 @@ export class EventService {
       if (!d.type?.trim() || (!d.date_not_fixed && !CalendarDate.parse(d.date)) || !d.venue?.trim() || !StudioLists.parseServices(d.services).length)
         throw new HttpError(400, 'Complete type, date (or date not fixed), location and services for every day')
       const booking = Number(d.booking_amount || 0)
-      if (booking < 0 || !Number.isFinite(booking) || (client.finance_mode === 'Per day' && booking > checkedQuote(d.price || 0, d.discount || 0)))
+      if (booking < 0 || !Number.isFinite(booking) || (client.finance_mode === 'Per day' && booking > Pricing.finalQuote(Number(d.price || 0), Number(d.discount || 0))))
         throw new HttpError(400, 'Booking amount must be within the day quotation')
     }
     const group = crypto.randomUUID()
@@ -93,7 +93,7 @@ export class EventService {
           type: d.type!.trim(), event_date: d.date_not_fixed ? null : d.date, venue: d.venue!.trim(), city: d.city || null,
           services: StudioLists.parseServices(d.services), start_time: d.start || '09:00', end_time: d.end || '18:00', status: 'Scheduled',
           booking_status: d.booking_status || null, booking_override: !!d.booking_status,
-          price: Number(d.price || 0), discount: Number(d.discount || 0), quotation: checkedQuote(d.price || 0, d.discount || 0),
+          price: Number(d.price || 0), discount: Number(d.discount || 0), quotation: Pricing.finalQuote(Number(d.price || 0), Number(d.discount || 0)),
         },
       })
       if (Number(d.booking_amount || 0) > 0)
@@ -117,7 +117,7 @@ export class EventService {
     const { team, ...set } = patch
     if (packages.length && (['price', 'discount'] as const).some(k => k in set && String(set[k]) !== String(event[k])))
       throw new HttpError(400, 'Edit quotation in the package card')
-    if ('price' in set || 'discount' in set) set.quotation = checkedQuote(Number(set.price ?? event.price), Number(set.discount ?? event.discount))
+    if ('price' in set || 'discount' in set) set.quotation = Pricing.finalQuote(Number(set.price ?? event.price), Number(set.discount ?? event.discount))
 
     const changes: Change[] = []
     if (Object.keys(set).length) changes.push({ op: 'update', table: 'events', match: { id }, set })
@@ -165,14 +165,6 @@ export class EventService {
     const [client] = await this.#db.select<ClientRow>('clients', { id })
     if (!client || client.deleted_at) throw new HttpError(404, 'Select a client')
     return client
-  }
-}
-
-function checkedQuote(price: number, discount: number): number {
-  try {
-    return Pricing.finalQuote(Number(price), Number(discount))
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message)
   }
 }
 
