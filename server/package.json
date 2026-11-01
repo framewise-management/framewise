@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/main.ts",
     "start": "node --env-file-if-exists=.env src/main.ts",
+    "studio:create": "node --env-file-if-exists=.env src/create-studio.ts",
     "typecheck": "tsc -p .",
     "test": "node --test \"src/**/*.test.ts\""
   },
